@@ -1,0 +1,53 @@
+{
+  "_comment": "Parameters for system-managed generators that the backend injects automatically. Edit here to adjust system generator behaviour without touching source code.",
+  "grid_imports": {
+    "carrier": "Imports",
+    "p_nom_floor": 5000,
+    "marginal_cost_base": 180.0
+  },
+  "load_shedding": {
+    "carrier": "LoadShedding",
+    "p_nom_floor": 1000,
+    "marginal_cost": 2000.0
+  },
+  "system_bess": {
+    "carrier": "Storage",
+    "max_hours": 4.0,
+    "efficiency_store": 0.91,
+    "efficiency_dispatch": 0.91,
+    "cyclic_state_of_charge": true,
+    "marginal_cost": 8.0
+  },
+  "demand_profile": {
+    "start_date": "2026-01-11",
+    "base_shape_24h": [0.66, 0.63, 0.61, 0.60, 0.61, 0.65,
+                       0.73, 0.82, 0.91, 0.96, 0.99, 1.01,
+                       1.03, 1.04, 1.02, 1.01, 1.06, 1.12,
+                       1.18, 1.16, 1.08, 0.96, 0.82, 0.72]
+  },
+  "availability_profiles": {
+    "Solar": {
+      "type": "sinusoidal",
+      "peak_hour": 12,
+      "half_width_hours": 6
+    },
+    "Wind": {
+      "type": "sinusoidal_offset",
+      "amplitude": 0.18,
+      "base": 0.58,
+      "period_hours": 24,
+      "phase_rad": 0.8,
+      "clip_min": 0.18,
+      "clip_max": 0.92
+    },
+    "Hydro": {
+      "type": "sinusoidal_offset",
+      "amplitude": 0.08,
+      "base": 0.46,
+      "period_hours": 24,
+      "phase_rad": 1.5,
+      "clip_min": 0.25,
+      "clip_max": 0.72
+    }
+  }
+}
