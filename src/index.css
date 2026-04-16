@@ -76,10 +76,6 @@ button {
   box-shadow: var(--shadow);
 }
 
-.pane {
-  padding: 18px;
-}
-
 .sidebar-brand {
   display: flex;
   justify-content: space-between;
@@ -400,6 +396,8 @@ button {
 .pane {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  padding: 22px 26px;
 }
 
 .pane-header {
@@ -1082,11 +1080,10 @@ button {
 
 /* ── Tables pane: two-panel layout ──────────────────────────────────────── */
 .tables-pane {
+  overflow: hidden !important;
+  padding: 0 !important;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  padding: 0 !important;
 }
 
 .tables-layout {
