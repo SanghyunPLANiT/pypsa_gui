@@ -618,9 +618,13 @@ function buildSystemLoadRows(results: RunResults | null): TimeSeriesRow[] {
 
 function FitToBounds({ bounds }: { bounds: LatLngBoundsExpression | null }) {
   const map = useMap();
+  const fitted = useRef(false);
 
   useEffect(() => {
-    if (bounds) map.fitBounds(bounds, { padding: [30, 30] });
+    if (bounds && !fitted.current) {
+      map.fitBounds(bounds, { padding: [30, 30] });
+      fitted.current = true;
+    }
   }, [bounds, map]);
 
   return null;
@@ -1541,8 +1545,8 @@ function App() {
   }, []);
 
 
-  const bounds = getBounds(model);
-  const busIndex = getBusIndex(model);
+  const bounds = useMemo(() => getBounds(model), [model.buses]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const busIndex = useMemo(() => getBusIndex(model), [model.buses]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!results) {
