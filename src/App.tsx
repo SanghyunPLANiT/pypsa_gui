@@ -43,7 +43,7 @@ type TsSheetName = (typeof TS_SHEETS)[number];
 type AnySheetName = SheetName | TsSheetName;
 type Primitive = string | number | boolean | null;
 type GridRow = Record<string, Primitive>;
-type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Analytics';
+type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Scenarios' | 'Analytics';
 type BrowserFileHandle = any;
 type ChartMode = 'line' | 'area' | 'bar';
 type ChartSectionType = ChartMode | 'donut';
@@ -90,6 +90,18 @@ interface RunSettings {
   snapshotStart: number;
   snapshotEnd: number;
   snapshotWeight: number;
+}
+
+interface SavedScenario {
+  id: string;
+  name: string;
+  params: ScenarioSettings;
+  runSettings: RunSettings;
+  status: 'idle' | 'running' | 'done' | 'error';
+  results: RunResults | null;
+  createdAt: number;
+  ranAt: number | null;
+  errorMsg: string | null;
 }
 
 interface SummaryItem {
@@ -1499,6 +1511,207 @@ function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps)
   );
 }
 
+// ── Scenarios Pane ──────────────────────────────────────────────────────────
+
+interface ScenariosPaneProps {
+  scenarios: SavedScenario[];
+  activeId: string;
+  maxSnapshots: number;
+  onSetActive: (id: string) => void;
+  onClone: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRun: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+  onUpdateParam: (id: string, key: keyof ScenarioSettings, value: number | string) => void;
+  onUpdateRunSettings: (id: string, key: keyof RunSettings, value: number) => void;
+}
+
+const SCENARIO_PARAM_FIELDS: Array<{ key: keyof ScenarioSettings; label: string; unit: string; min: number; max: number; step: number }> = [
+  { key: 'demandGrowth', label: 'Demand growth', unit: '%', min: -10, max: 50, step: 0.5 },
+  { key: 'carbonPrice', label: 'Carbon price', unit: '$/t', min: 0, max: 500, step: 5 },
+  { key: 'renewableTarget', label: 'RE target', unit: '%', min: 0, max: 100, step: 1 },
+  { key: 'storageExpansion', label: 'Storage add', unit: 'MW', min: 0, max: 10000, step: 100 },
+  { key: 'transmissionExpansion', label: 'Tx expansion', unit: '%', min: 0, max: 100, step: 5 },
+];
+
+const STATUS_LABEL: Record<SavedScenario['status'], string> = {
+  idle: 'Not run',
+  running: 'Running…',
+  done: 'Done',
+  error: 'Error',
+};
+
+function ScenarioStatusBadge({ status }: { status: SavedScenario['status'] }) {
+  return (
+    <span className={`sc-status sc-status--${status}`}>{STATUS_LABEL[status]}</span>
+  );
+}
+
+function ScenariosPane({
+  scenarios, activeId, maxSnapshots,
+  onSetActive, onClone, onDelete, onRun, onRename, onUpdateParam, onUpdateRunSettings,
+}: ScenariosPaneProps) {
+  const doneScenarios = scenarios.filter((s) => s.status === 'done' && s.results);
+
+  return (
+    <div className="scenarios-pane">
+      {/* Header */}
+      <div className="scenarios-header">
+        <div>
+          <p className="eyebrow">Scenario Manager</p>
+          <h2>Scenarios</h2>
+        </div>
+        <button className="run-button" onClick={() => onClone(activeId)}>+ New Scenario</button>
+      </div>
+
+      {/* Scenario cards */}
+      <div className="scenarios-list">
+        {scenarios.map((sc) => {
+          const isActive = sc.id === activeId;
+          return (
+            <div key={sc.id} className={`sc-card${isActive ? ' sc-card--active' : ''}`}>
+              {/* Card header row */}
+              <div className="sc-card-header">
+                <input
+                  className="sc-name-input"
+                  value={sc.name}
+                  onChange={(e) => onRename(sc.id, e.target.value)}
+                  onClick={() => onSetActive(sc.id)}
+                />
+                <ScenarioStatusBadge status={sc.status} />
+                {sc.ranAt && (
+                  <span className="sc-ran-at">
+                    {new Date(sc.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                <div className="sc-card-actions">
+                  {!isActive && (
+                    <button className="tb-btn" onClick={() => onSetActive(sc.id)}>Select</button>
+                  )}
+                  <button className="tb-btn" onClick={() => onClone(sc.id)}>Clone</button>
+                  <button
+                    className="run-button"
+                    style={{ fontSize: '0.78rem', padding: '4px 12px' }}
+                    disabled={sc.status === 'running'}
+                    onClick={() => onRun(sc.id)}
+                  >
+                    {sc.status === 'running' ? 'Running…' : 'Run'}
+                  </button>
+                  {scenarios.length > 1 && (
+                    <button className="tb-btn tb-btn--muted" onClick={() => onDelete(sc.id)}>✕</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Param grid */}
+              <div className="sc-params">
+                {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step }) => (
+                  <label key={key} className="sc-param">
+                    <span className="sc-param-label">{label}</span>
+                    <div className="sc-param-input-row">
+                      <input
+                        type="number"
+                        className="sc-param-input"
+                        value={sc.params[key] as number}
+                        min={min} max={max} step={step}
+                        onChange={(e) => onUpdateParam(sc.id, key, parseFloat(e.target.value) || 0)}
+                      />
+                      <span className="sc-param-unit">{unit}</span>
+                    </div>
+                  </label>
+                ))}
+                {maxSnapshots > 1 && (
+                  <label className="sc-param">
+                    <span className="sc-param-label">Snapshots</span>
+                    <div className="sc-param-input-row">
+                      <input
+                        type="number"
+                        className="sc-param-input"
+                        value={sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart}
+                        min={1} max={maxSnapshots} step={1}
+                        onChange={(e) => {
+                          const v = Math.min(maxSnapshots, Math.max(1, parseInt(e.target.value) || 1));
+                          onUpdateRunSettings(sc.id, 'snapshotEnd', sc.runSettings.snapshotStart + v);
+                        }}
+                      />
+                      <span className="sc-param-unit">of {maxSnapshots}</span>
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              {sc.status === 'error' && sc.errorMsg && (
+                <p className="sc-error-msg">{sc.errorMsg}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Comparison table */}
+      {doneScenarios.length >= 2 && (
+        <div className="sc-comparison">
+          <p className="sc-section-title">Comparison — {doneScenarios.length} completed scenarios</p>
+          <div className="sc-comparison-table-wrap">
+            <table className="sc-comparison-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Total cost</th>
+                  <th>CO₂ emissions</th>
+                  <th>Load shedding</th>
+                  <th>RE share</th>
+                  <th>Snapshots</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doneScenarios.map((sc) => {
+                  const sum = sc.results!.summary;
+                  const get = (label: string) => sum.find((s) => s.label.toLowerCase().includes(label.toLowerCase()))?.value ?? '—';
+                  return (
+                    <tr
+                      key={sc.id}
+                      className={sc.id === activeId ? 'sc-comparison-active' : ''}
+                      onClick={() => onSetActive(sc.id)}
+                    >
+                      <td><strong>{sc.name}</strong></td>
+                      <td>{get('cost')}</td>
+                      <td>{get('emiss')}</td>
+                      <td>{get('shedding') !== '—' ? get('shedding') : get('shed')}</td>
+                      <td>{get('renew')}</td>
+                      <td>{sc.results!.runMeta.snapshotCount}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function makeScenario(
+  name: string,
+  params: ScenarioSettings = DEFAULT_SCENARIO,
+  runSettings: RunSettings = DEFAULT_RUN_SETTINGS,
+): SavedScenario {
+  return {
+    id: `sc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    params,
+    runSettings,
+    status: 'idle',
+    results: null,
+    createdAt: Date.now(),
+    ranAt: null,
+    errorMsg: null,
+  };
+}
+
+const _INIT_SCENARIO = makeScenario('Base Case');
+
 /** Derive the max snapshot count exclusively from the workbook's snapshots sheet.
  *  'now' or empty → 1 (static single-period model).
  *  Real datetime rows → their count.
@@ -1517,10 +1730,24 @@ function snapshotMaxFromWorkbook(rows: GridRow[]): number {
 function App() {
   const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
   const [tab, setTab] = useState<WorkspaceTab>('Map');
-  const [scenario] = useState<ScenarioSettings>(DEFAULT_SCENARIO);
-  const [runSettings, setRunSettings] = useState<RunSettings>(DEFAULT_RUN_SETTINGS);
+  const [scenarios, setScenarios] = useState<SavedScenario[]>([_INIT_SCENARIO]);
+  const [activeId, setActiveId] = useState<string>(_INIT_SCENARIO.id);
   const [maxSnapshots, setMaxSnapshots] = useState<number>(1);
-  const [results, setResults] = useState<RunResults | null>(null);
+
+  // Derived from active scenario
+  const activeScenario = scenarios.find((s) => s.id === activeId) ?? scenarios[0];
+  const scenario = activeScenario.params;
+  const runSettings = activeScenario.runSettings;
+  const results = activeScenario.results;
+
+  const patchScenario = (id: string, patch: Partial<SavedScenario>) =>
+    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+
+  const setRunSettings = (update: RunSettings | ((prev: RunSettings) => RunSettings)) =>
+    setScenarios((prev) => prev.map((s) => {
+      if (s.id !== activeId) return s;
+      return { ...s, runSettings: typeof update === 'function' ? update(s.runSettings) : update };
+    }));
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
@@ -1544,7 +1771,10 @@ function App() {
       const snapshotMax = snapshotMaxFromWorkbook(sampleModel.snapshots);
       setMaxSnapshots(snapshotMax);
       setModel(sampleModel);
-      setRunSettings((s) => ({ ...s, snapshotEnd: Math.min(s.snapshotEnd, snapshotMax) }));
+      setScenarios((prev) => prev.map((s) => ({
+        ...s,
+        runSettings: { ...s.runSettings, snapshotEnd: Math.min(s.runSettings.snapshotEnd, snapshotMax) },
+      })));
     }).catch(() => null);
   }, []);
 
@@ -1571,13 +1801,47 @@ function App() {
     const snapshotMax = snapshotMaxFromWorkbook(nextModel.snapshots);
     setMaxSnapshots(snapshotMax);
     setModel(nextModel);
-    setResults(null);
     setChartSections([]);
     setValidateResult(null);
     setAnalyticsFocus({ type: 'system' });
-    setRunSettings({ ...DEFAULT_RUN_SETTINGS, snapshotEnd: Math.min(DEFAULT_RUN_SETTINGS.snapshotEnd, snapshotMax) });
+    setScenarios((prev) => prev.map((s) => ({
+      ...s,
+      results: null,
+      status: 'idle' as const,
+      errorMsg: null,
+      runSettings: { ...DEFAULT_RUN_SETTINGS, snapshotEnd: Math.min(DEFAULT_RUN_SETTINGS.snapshotEnd, snapshotMax) },
+    })));
     if (name) setFilename(name);
   };
+
+  // ── Scenario management handlers ────────────────────────────────────────
+  const handleCloneScenario = (id: string) => {
+    const src = scenarios.find((s) => s.id === id) ?? activeScenario;
+    const clone = makeScenario(`${src.name} (copy)`, { ...src.params }, { ...src.runSettings });
+    setScenarios((prev) => [...prev, clone]);
+    setActiveId(clone.id);
+  };
+
+  const handleDeleteScenario = (id: string) => {
+    setScenarios((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      if (activeId === id) setActiveId(next[0]?.id ?? '');
+      return next;
+    });
+  };
+
+  const handleRenameScenario = (id: string, name: string) =>
+    patchScenario(id, { name });
+
+  const handleUpdateScenarioParam = (id: string, key: keyof ScenarioSettings, value: number | string) =>
+    setScenarios((prev) => prev.map((s) =>
+      s.id === id ? { ...s, params: { ...s.params, [key]: value } } : s
+    ));
+
+  const handleUpdateScenarioRunSettings = (id: string, key: keyof RunSettings, value: number) =>
+    setScenarios((prev) => prev.map((s) =>
+      s.id === id ? { ...s, runSettings: { ...s.runSettings, [key]: value } } : s
+    ));
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1586,7 +1850,6 @@ function App() {
       const nextModel = await parseWorkbook(file);
       resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
       setFileHandle(null);
-      setResults(null);
       setStatus(`Imported workbook: ${file.name}. Analytics will populate after the next run.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Workbook import failed.');
@@ -1681,22 +1944,20 @@ function App() {
     }
   };
 
-  const buildRunOptions = () => {
-    const snapshotCount = runSettings.snapshotEnd - runSettings.snapshotStart;
-    return {
+  const handleRunModel = async (targetId?: string) => {
+    const runId = targetId ?? activeId;
+    const sc = scenarios.find((s) => s.id === runId) ?? activeScenario;
+    setRunDialogOpen(false);
+    const snapshotCount = sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart;
+    const runOptions = {
       model,
-      scenario,
+      scenario: sc.params,
       options: {
         snapshotCount,
-        snapshotStart: runSettings.snapshotStart,
-        snapshotWeight: runSettings.snapshotWeight,
+        snapshotStart: sc.runSettings.snapshotStart,
+        snapshotWeight: sc.runSettings.snapshotWeight,
       },
     };
-  };
-
-  const handleRunModel = async () => {
-    setRunDialogOpen(false);
-    const snapshotCount = runSettings.snapshotEnd - runSettings.snapshotStart;
 
     if (dryRun) {
       setStatus('Validating model structure...');
@@ -1704,7 +1965,7 @@ function App() {
         const response = await fetch(`${API_BASE}/api/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildRunOptions()),
+          body: JSON.stringify(runOptions),
         });
         const result = await response.json();
         setValidateResult(result);
@@ -1716,24 +1977,28 @@ function App() {
       return;
     }
 
-    setStatus(`Running ${scenario.caseName} with ${snapshotCount} snapshots at ${runSettings.snapshotWeight} h weighting...`);
+    patchScenario(runId, { status: 'running', errorMsg: null });
+    setStatus(`Running "${sc.name}" — ${snapshotCount} snapshots…`);
     try {
       const response = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildRunOptions()),
+        body: JSON.stringify(runOptions),
       });
       if (!response.ok) {
         const message = await response.text();
         throw new Error(message || `Backend run failed with status ${response.status}.`);
       }
       const nextResults = (await response.json()) as RunResults;
-      setResults(nextResults);
+      patchScenario(runId, { status: 'done', results: nextResults, ranAt: Date.now() });
+      setActiveId(runId);
       setAnalyticsFocus({ type: 'system' });
       setTab('Analytics');
-      setStatus(`Backend PyPSA run completed with ${nextResults.runMeta.snapshotCount} snapshots over ${nextResults.runMeta.modeledHours} modeled hours.`);
+      setStatus(`"${sc.name}" completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Backend PyPSA run failed.');
+      const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
+      patchScenario(runId, { status: 'error', errorMsg: msg });
+      setStatus(msg);
     }
   };
 
@@ -1953,10 +2218,15 @@ function App() {
               <span>Workbook</span>
               <strong>{filename}</strong>
             </div>
+            <div className="case-chip" style={{ cursor: 'pointer' }} onClick={() => setTab('Scenarios')}>
+              <span>Active scenario</span>
+              <strong>{activeScenario.name}</strong>
+              <ScenarioStatusBadge status={activeScenario.status} />
+            </div>
             <span className="topbar-status" title={status}>{status}</span>
           </div>
           <nav className="tab-nav">
-            {(['Map', 'Tables', 'Validation', 'Analytics'] as WorkspaceTab[]).map((item) => (
+            {(['Map', 'Tables', 'Validation', 'Scenarios', 'Analytics'] as WorkspaceTab[]).map((item) => (
               <button
                 key={item}
                 className={`tab-button ${tab === item ? 'is-active' : ''} ${item === 'Validation' && validateResult && !validateResult.valid ? 'tab-button--error' : ''} ${item === 'Validation' && validateResult && validateResult.valid ? 'tab-button--ok' : ''}`}
@@ -2125,6 +2395,23 @@ function App() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {tab === 'Scenarios' && (
+              <div className="pane scenarios-pane-wrap">
+                <ScenariosPane
+                  scenarios={scenarios}
+                  activeId={activeId}
+                  maxSnapshots={maxSnapshots}
+                  onSetActive={setActiveId}
+                  onClone={handleCloneScenario}
+                  onDelete={handleDeleteScenario}
+                  onRun={(id) => handleRunModel(id)}
+                  onRename={handleRenameScenario}
+                  onUpdateParam={handleUpdateScenarioParam}
+                  onUpdateRunSettings={handleUpdateScenarioRunSettings}
+                />
               </div>
             )}
 
