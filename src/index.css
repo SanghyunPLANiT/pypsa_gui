@@ -1987,3 +1987,176 @@ path.leaflet-interactive:focus {
   .dashboard-row { grid-template-columns: 1fr; }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QW-1  Generator colour legend on map
+   QW-2  Loading colour scale on Analytics map
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.map-legend {
+  position: absolute;
+  bottom: 24px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  pointer-events: none;
+}
+.map-legend-section { margin-bottom: 6px; }
+.map-legend-section:last-child { margin-bottom: 0; }
+.map-legend-title {
+  font-weight: 700;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+.map-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.7);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+.map-legend-line-svg { flex-shrink: 0; }
+.map-legend-label { color: var(--text); }
+
+/* Loading gradient legend */
+.loading-legend { bottom: 24px; right: 12px; }
+.loading-gradient-bar {
+  height: 10px;
+  width: 120px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #22c55e, #f59e0b, #dc2626);
+  margin: 4px 0 2px;
+}
+.loading-gradient-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.67rem;
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QW-3  Tables nav search filter
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.nav-search-wrap {
+  position: relative;
+  padding: 8px 8px 0;
+}
+.nav-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 28px 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: #f8fafc;
+  color: var(--text);
+  outline: none;
+}
+.nav-search:focus {
+  border-color: var(--accent, #2563eb);
+  background: #fff;
+}
+.nav-search-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-30%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1;
+  padding: 0 2px;
+}
+.nav-search-clear:hover { color: var(--text); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QW-5  Toast notifications
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  min-width: 240px;
+  max-width: 380px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+  pointer-events: all;
+  background: #1e293b;
+  color: #f1f5f9;
+  border-left: 3px solid #64748b;
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast--visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+.toast--success { border-left-color: #22c55e; }
+.toast--error   { border-left-color: #ef4444; }
+.toast--info    { border-left-color: #38bdf8; }
+.toast-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+.toast--success .toast-icon { color: #22c55e; }
+.toast--error   .toast-icon { color: #ef4444; }
+.toast--info    .toast-icon { color: #38bdf8; }
+.toast-message { flex: 1; }
+.toast-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+.toast-close:hover { color: #f1f5f9; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QW-7  Freeze first column in spreadsheet (z-index corner fix)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Header cells sit above body content when scrolling vertically */
+.spreadsheet-table thead th { z-index: 2; }
+/* Row-number column in header corner sits above both sticky axes */
+.spreadsheet-table thead .rn-col { z-index: 3; }
+/* Row-number column body cells stay above horizontally-scrolled data */
+.spreadsheet-table tbody .rn-col { z-index: 1; }

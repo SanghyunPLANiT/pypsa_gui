@@ -27,8 +27,10 @@ import { MapPane } from './components/panes/MapPane';
 import { TablesPane } from './components/panes/TablesPane';
 import { ValidationPane } from './components/panes/ValidationPane';
 import { AnalyticsPane, EmptyAnalytics } from './components/panes/AnalyticsPane';
+import { ToastProvider, useToast } from './components/common/Toast';
 
-function App() {
+function AppInner() {
+  const { showToast } = useToast();
   const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
   const [tab, setTab] = useState<WorkspaceTab>('Map');
   const [results, setResults] = useState<RunResults | null>(null);
@@ -102,8 +104,11 @@ function App() {
       resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
       setFileHandle(null);
       setStatus(`Imported workbook: ${file.name}. Analytics will populate after the next run.`);
+      showToast(`Opened ${file.name}`, 'success');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Workbook import failed.');
+      const msg = error instanceof Error ? error.message : 'Workbook import failed.';
+      setStatus(msg);
+      showToast(msg, 'error');
     } finally {
       if (event.target) event.target.value = '';
     }
@@ -126,8 +131,12 @@ function App() {
       resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
       setFileHandle(handle);
       setStatus(`Opened workbook: ${file.name}`);
+      showToast(`Opened ${file.name}`, 'success');
     } catch (error) {
-      if ((error as Error)?.name !== 'AbortError') setStatus('Workbook open failed.');
+      if ((error as Error)?.name !== 'AbortError') {
+        setStatus('Workbook open failed.');
+        showToast('Workbook open failed.', 'error');
+      }
     }
   };
 
@@ -162,6 +171,7 @@ function App() {
       exportWorkbook(model, requested);
       setFilename(requested);
       setStatus(`Saved workbook as ${requested}.`);
+      showToast(`Saved as ${requested}`, 'success');
       return;
     }
     try {
@@ -175,8 +185,12 @@ function App() {
       setFileHandle(handle);
       setFilename(handle.name || suggestedName);
       setStatus(`Saved workbook as ${handle.name || suggestedName}.`);
+      showToast(`Saved as ${handle.name || suggestedName}`, 'success');
     } catch (error) {
-      if ((error as Error)?.name !== 'AbortError') setStatus('Save As failed.');
+      if ((error as Error)?.name !== 'AbortError') {
+        setStatus('Save As failed.');
+        showToast('Save failed.', 'error');
+      }
     }
   };
 
@@ -216,7 +230,9 @@ function App() {
         const result = await response.json();
         setValidateResult(result);
         setTab('Validation');
-        setStatus(result.valid ? 'Validation passed.' : `Validation failed: ${result.errors.length} error(s).`);
+        const vMsg = result.valid ? 'Validation passed.' : `Validation failed: ${result.errors.length} error(s).`;
+        setStatus(vMsg);
+        showToast(vMsg, result.valid ? 'success' : 'error');
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Validation request failed.');
       }
@@ -240,11 +256,14 @@ function App() {
       setRunStatus('done');
       setAnalyticsFocus({ type: 'system' });
       setTab('Analytics');
-      setStatus(`Completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`);
+      const doneMsg = `Completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`;
+      setStatus(doneMsg);
+      showToast(doneMsg, 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
       setRunStatus('error');
       setStatus(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -419,7 +438,11 @@ function App() {
                     className="tb-btn sg-full"
                     disabled={!results}
                     title={results ? 'Export all inputs and outputs to Excel' : 'Run the model first to export results'}
-                    onClick={() => results && exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''))}
+                    onClick={() => {
+                      if (!results) return;
+                      exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
+                      showToast('Full model exported to Excel', 'success');
+                    }}
                   >
                     Export
                   </button>
@@ -589,6 +612,14 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
   );
 }
 

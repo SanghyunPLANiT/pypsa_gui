@@ -4,6 +4,7 @@ import { clamp, numberValue } from '../../utils/helpers';
 import { aggregateMetricRows, buildDonutFromMetric } from '../../utils/analytics';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { exportChartToExcel } from '../../utils/exportChart';
+import { useToast } from '../common/Toast';
 import { DonutChart } from './DonutChart';
 import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { TimelineSlider } from '../common/DualRangeSlider';
@@ -22,6 +23,7 @@ export function UserDefinedChartCard({
   onRemove: () => void;
 }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const { showToast } = useToast();
   const metric = metricOptions.find((item) => item.key === section.metricKey);
   const hasMetric = Boolean(metric);
   const metricRows = metric?.rows || [];
@@ -32,11 +34,12 @@ export function UserDefinedChartCard({
 
   const handleExport = () => {
     if (!metric) return;
+    let promise: Promise<void>;
     if (section.chartType === 'donut') {
       const donutData = buildDonutFromMetric(metric, safeStart, safeEnd);
-      const headers = ['label', 'value'];
-      const rows = donutData.map((d) => ({ label: d.label, value: d.value }));
-      exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
+      promise = exportChartToExcel(metric.label, ['label', 'value'],
+        donutData.map((d) => ({ label: d.label, value: d.value })),
+        chartContainerRef.current);
     } else {
       const seriesKeys = metric.series.map((s) => s.key);
       const headers = ['timestamp', ...seriesKeys];
@@ -45,8 +48,9 @@ export function UserDefinedChartCard({
         seriesKeys.forEach((k) => { row[k] = numberValue(r[k] as number | string | undefined); });
         return row;
       });
-      exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
+      promise = exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
     }
+    promise.then(() => showToast(`Exported ${metric.label}`, 'success')).catch(() => showToast('Export failed', 'error'));
   };
 
   return (

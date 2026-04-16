@@ -5,8 +5,9 @@ import {
   AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../types';
 import { EMPTY_METRIC_KEY } from '../../constants';
-import { numberValue, stringValue, carrierColor } from '../../utils/helpers';
+import { numberValue, stringValue, carrierColor, loadingColor } from '../../utils/helpers';
 import { FitToBounds } from '../map/FitToBounds';
+import { LoadingLegend, MapLegend } from '../map/MapLegend';
 import { SummaryCards } from '../common/SummaryCards';
 import { UserDefinedChartCard } from '../charts/UserDefinedChartCard';
 import { ResultsDashboard } from '../charts/ResultsDashboard';
@@ -80,6 +81,17 @@ export function AnalyticsPane({
     })
     .filter(Boolean) as Array<{ name: string; positions: [number, number][] }>;
 
+  // Build line loading lookup for QW-2 colour scale
+  const loadingMap = Object.fromEntries(
+    results.lineLoading.map((l) => [l.label, l.value]),
+  );
+  const hasLineLoading = results.lineLoading.length > 0;
+
+  // Unique generator carriers for legend
+  const uniqueCarriers = Array.from(
+    new Set(model.generators.map((g) => stringValue(g.carrier)).filter(Boolean)),
+  );
+
   const focusSummary =
     analyticsFocus.type === 'generator' ? results.assetDetails.generators[analyticsFocus.key]?.summary || []
     : analyticsFocus.type === 'bus' ? results.assetDetails.buses[analyticsFocus.key]?.summary || []
@@ -124,7 +136,7 @@ export function AnalyticsPane({
             <strong>{focusTitle}</strong>
           </div>
         </div>
-        <div className="analytics-map-frame">
+        <div className="analytics-map-frame" style={{ position: 'relative' }}>
           <MapContainer center={[36.35, 127.9]} zoom={7} className="leaflet-map" scrollWheelZoom>
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -133,31 +145,37 @@ export function AnalyticsPane({
             <FitToBounds bounds={bounds} />
             {lineGeometries.map((line) => {
               const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === line.name;
+              const pct = loadingMap[line.name] ?? 0;
+              const lineCol = sel ? '#f59e0b' : (hasLineLoading ? loadingColor(pct) : '#2563eb');
               return (
                 <Polyline key={line.name} positions={line.positions}
-                  pathOptions={{ color: sel ? '#f59e0b' : '#2563eb', weight: sel ? 8 : 2, opacity: sel ? 1 : 0.72 }}
+                  pathOptions={{ color: lineCol, weight: sel ? 8 : 3, opacity: sel ? 1 : 0.85 }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: line.name }) }}>
-                  <Tooltip>{line.name} · Line</Tooltip>
+                  <Tooltip>{line.name} · Line · {pct.toFixed(1)}% loaded</Tooltip>
                 </Polyline>
               );
             })}
             {linkGeometries.map((link) => {
               const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === link.name;
+              const pct = loadingMap[link.name] ?? 0;
+              const linkCol = sel ? '#f59e0b' : (hasLineLoading ? loadingColor(pct) : '#0f766e');
               return (
                 <Polyline key={link.name} positions={link.positions}
-                  pathOptions={{ color: sel ? '#f59e0b' : '#0f766e', weight: sel ? 8 : 3, opacity: sel ? 1 : 0.72, dashArray: sel ? undefined : '10 8' }}
+                  pathOptions={{ color: linkCol, weight: sel ? 8 : 3, opacity: sel ? 1 : 0.85, dashArray: sel ? undefined : '10 8' }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: link.name }) }}>
-                  <Tooltip>{link.name} · Link</Tooltip>
+                  <Tooltip>{link.name} · Link · {pct.toFixed(1)}% loaded</Tooltip>
                 </Polyline>
               );
             })}
             {transformerGeometries.map((transformer) => {
               const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === transformer.name;
+              const pct = loadingMap[transformer.name] ?? 0;
+              const txCol = sel ? '#f59e0b' : (hasLineLoading ? loadingColor(pct) : '#f97316');
               return (
                 <Polyline key={transformer.name} positions={transformer.positions}
-                  pathOptions={{ color: sel ? '#f59e0b' : '#f97316', weight: sel ? 8 : 3, opacity: sel ? 1 : 0.72, dashArray: sel ? undefined : '8 6' }}
+                  pathOptions={{ color: txCol, weight: sel ? 8 : 3, opacity: sel ? 1 : 0.85, dashArray: sel ? undefined : '8 6' }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: transformer.name }) }}>
-                  <Tooltip>{transformer.name} · Transformer</Tooltip>
+                  <Tooltip>{transformer.name} · Transformer · {pct.toFixed(1)}% loaded</Tooltip>
                 </Polyline>
               );
             })}
@@ -219,6 +237,8 @@ export function AnalyticsPane({
               );
             })}
           </MapContainer>
+          <MapLegend carriers={uniqueCarriers} showLines={!hasLineLoading} />
+          <LoadingLegend show={hasLineLoading} />
         </div>
       </section>
 

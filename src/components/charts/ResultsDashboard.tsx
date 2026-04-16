@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../types';
 import { numberValue } from '../../utils/helpers';
 import { exportChartToExcel } from '../../utils/exportChart';
+import { useToast } from '../common/Toast';
 import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { DonutChart } from './DonutChart';
 import { DurationCurveCard } from './DurationCurveCard';
@@ -93,6 +94,8 @@ export function ResultsDashboard({
   systemPriceRows,
   storageRows,
 }: Props) {
+  const { showToast } = useToast();
+
   // Refs for chart containers (used to grab the SVG for export)
   const dispatchRef = useRef<HTMLDivElement>(null);
   const energyMixRef = useRef<HTMLDivElement>(null);
@@ -136,7 +139,11 @@ export function ResultsDashboard({
 
   // ── Export helpers ────────────────────────────────────────────────────────
 
-  const exportDispatch = () => {
+  const doExport = (fn: () => Promise<void> | void, label: string) => {
+    Promise.resolve(fn()).then(() => showToast(`Exported ${label}`, 'success')).catch(() => showToast(`Export failed`, 'error'));
+  };
+
+  const exportDispatch = () => doExport(() => {
     const carriers = dispatchSeries.map((s) => s.key);
     const headers = ['timestamp', ...carriers];
     const rows = dispatchRows.map((r) => {
@@ -144,41 +151,36 @@ export function ResultsDashboard({
       carriers.forEach((c) => { row[c] = numberValue(r[c] as number | string | undefined); });
       return row;
     });
-    exportChartToExcel('generation_dispatch', headers, rows, dispatchRef.current);
-  };
+    return exportChartToExcel('generation_dispatch', headers, rows, dispatchRef.current);
+  }, 'Generation Dispatch');
 
-  const exportEnergyMix = () => {
-    const headers = ['carrier', 'energy_MWh'];
-    const rows = results.carrierMix.map((m) => ({ carrier: m.label, energy_MWh: m.value }));
-    exportChartToExcel('energy_mix', headers, rows, energyMixRef.current);
-  };
+  const exportEnergyMix = () => doExport(() =>
+    exportChartToExcel('energy_mix', ['carrier', 'energy_MWh'],
+      results.carrierMix.map((m) => ({ carrier: m.label, energy_MWh: m.value })),
+      energyMixRef.current), 'Energy Mix');
 
-  const exportCostBreakdown = () => {
-    const headers = ['category', 'cost'];
-    const rows = results.costBreakdown.map((c) => ({ category: c.label, cost: c.value }));
-    exportChartToExcel('cost_breakdown', headers, rows, costRef.current);
-  };
+  const exportCostBreakdown = () => doExport(() =>
+    exportChartToExcel('cost_breakdown', ['category', 'cost'],
+      results.costBreakdown.map((c) => ({ category: c.label, cost: c.value })),
+      costRef.current), 'Cost Breakdown');
 
-  const exportLoadDuration = () => {
-    const headers = ['rank', 'load_MW'];
-    const rows = sortedLoad.map((v, i) => ({ rank: i + 1, load_MW: v }));
-    exportChartToExcel('load_duration_curve', headers, rows, loadDurRef.current);
-  };
+  const exportLoadDuration = () => doExport(() =>
+    exportChartToExcel('load_duration_curve', ['rank', 'load_MW'],
+      sortedLoad.map((v, i) => ({ rank: i + 1, load_MW: v })),
+      loadDurRef.current), 'Load Duration Curve');
 
-  const exportPriceDuration = () => {
-    const headers = ['rank', 'price_per_MWh'];
-    const rows = sortedPrice.map((v, i) => ({ rank: i + 1, price_per_MWh: v }));
-    exportChartToExcel('price_duration_curve', headers, rows, priceDurRef.current);
-  };
+  const exportPriceDuration = () => doExport(() =>
+    exportChartToExcel('price_duration_curve', ['rank', 'price_per_MWh'],
+      sortedPrice.map((v, i) => ({ rank: i + 1, price_per_MWh: v })),
+      priceDurRef.current), 'Price Duration Curve');
 
-  const exportStorage = () => {
-    const headers = ['timestamp', 'state_MWh'];
-    const rows = storageRows.map((r) => ({
-      timestamp: r.timestamp ?? r.label,
-      state_MWh: numberValue(r['state'] as number | string | undefined),
-    }));
-    exportChartToExcel('storage_state_of_charge', headers, rows, storageRef.current);
-  };
+  const exportStorage = () => doExport(() =>
+    exportChartToExcel('storage_state_of_charge', ['timestamp', 'state_MWh'],
+      storageRows.map((r) => ({
+        timestamp: r.timestamp ?? r.label,
+        state_MWh: numberValue(r['state'] as number | string | undefined),
+      })),
+      storageRef.current), 'Storage SoC');
 
   return (
     <div className="results-dashboard">

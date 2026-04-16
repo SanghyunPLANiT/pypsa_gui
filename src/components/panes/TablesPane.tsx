@@ -94,6 +94,7 @@ interface TablesPaneProps {
 export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [navSearch, setNavSearch] = useState('');
 
   const toggleGroup = (sheet: string) =>
     setCollapsed((s) => { const n = new Set(s); n.has(sheet) ? n.delete(sheet) : n.add(sheet); return n; });
@@ -113,11 +114,26 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPan
   return (
     <div className="tables-layout">
       <nav className="tables-nav">
+        <div className="nav-search-wrap">
+          <input
+            className="nav-search"
+            type="text"
+            placeholder="Filter sheets…"
+            value={navSearch}
+            onChange={(e) => setNavSearch(e.target.value)}
+            aria-label="Filter sheets"
+          />
+          {navSearch && (
+            <button className="nav-search-clear" onClick={() => setNavSearch('')} aria-label="Clear filter">×</button>
+          )}
+        </div>
         <div className="nav-toolbar">
           <button className="tb-btn" onClick={() => setCollapsed(new Set(TABLE_GROUPS.map((g) => g.sheet)))}>Collapse all</button>
           <button className="tb-btn" onClick={() => setCollapsed(new Set())}>Expand all</button>
         </div>
-        {TABLE_GROUPS.map((g) => {
+        {TABLE_GROUPS.filter((g) =>
+          !navSearch || g.label.toLowerCase().includes(navSearch.toLowerCase()) || g.sheet.toLowerCase().includes(navSearch.toLowerCase())
+        ).map((g) => {
           const open = !collapsed.has(g.sheet);
           const tsRows: GridRow[] = g.tsSheet ? ((model as any)[g.tsSheet] as GridRow[]) ?? [] : [];
           const staticActive = sel.kind === 'static' && sel.sheet === g.sheet;
