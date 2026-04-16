@@ -2158,80 +2158,94 @@ function App() {
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           />
                           <FitToBounds bounds={bounds} />
-                          {lineGeometries.map((line) => (
-                            <Polyline
-                              key={line.name}
-                              positions={line.positions}
-                              pathOptions={{
-                                color: analyticsFocus.type === 'branch' && analyticsFocus.key === line.name ? '#1d4ed8' : '#2563eb',
-                                weight: analyticsFocus.type === 'branch' && analyticsFocus.key === line.name ? 5 : 3,
-                                opacity: 0.86,
-                              }}
-                              eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: line.name }) }}
-                            >
-                              <Tooltip>{line.name} · Line</Tooltip>
-                            </Polyline>
-                          ))}
-                          {linkGeometries.map((link) => (
-                            <Polyline
-                              key={link.name}
-                              positions={link.positions}
-                              pathOptions={{
-                                color: analyticsFocus.type === 'branch' && analyticsFocus.key === link.name ? '#0d9488' : '#0f766e',
-                                weight: analyticsFocus.type === 'branch' && analyticsFocus.key === link.name ? 6 : 4,
-                                opacity: 0.86,
-                                dashArray: '10 8',
-                              }}
-                              eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: link.name }) }}
-                            >
-                              <Tooltip>{link.name} · Link</Tooltip>
-                            </Polyline>
-                          ))}
-                          {transformerGeometries.map((transformer) => (
-                            <Polyline
-                              key={transformer.name}
-                              positions={transformer.positions}
-                              pathOptions={{
-                                color: analyticsFocus.type === 'branch' && analyticsFocus.key === transformer.name ? '#ea580c' : '#f97316',
-                                weight: analyticsFocus.type === 'branch' && analyticsFocus.key === transformer.name ? 6 : 4,
-                                opacity: 0.84,
-                                dashArray: '8 6',
-                              }}
-                              eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: transformer.name }) }}
-                            >
-                              <Tooltip>{transformer.name} · Transformer</Tooltip>
-                            </Polyline>
-                          ))}
-                          {model.buses.map((bus, index) => (
-                            <CircleMarker
-                              key={`${stringValue(bus.name)}-analytics-${index}`}
-                              center={[numberValue(bus.y), numberValue(bus.x)]}
-                              radius={analyticsFocus.type === 'bus' && analyticsFocus.key === stringValue(bus.name) ? 11 : 8}
-                              pathOptions={{
-                                color: '#ffffff',
-                                weight: 2,
-                                fillColor: analyticsFocus.type === 'bus' && analyticsFocus.key === stringValue(bus.name) ? '#1d4ed8' : '#2563eb',
-                                fillOpacity: 0.96,
-                              }}
-                              eventHandlers={{ click: () => setAnalyticsFocus({ type: 'bus', key: stringValue(bus.name) }) }}
-                            >
-                              <Tooltip>{stringValue(bus.name)} · Bus</Tooltip>
-                            </CircleMarker>
-                          ))}
+                          {lineGeometries.map((line) => {
+                            const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === line.name;
+                            return (
+                              <Polyline
+                                key={line.name}
+                                positions={line.positions}
+                                pathOptions={{
+                                  color: sel ? '#f59e0b' : '#2563eb',
+                                  weight: sel ? 8 : 2,
+                                  opacity: sel ? 1 : 0.72,
+                                }}
+                                eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: line.name }) }}
+                              >
+                                <Tooltip>{line.name} · Line</Tooltip>
+                              </Polyline>
+                            );
+                          })}
+                          {linkGeometries.map((link) => {
+                            const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === link.name;
+                            return (
+                              <Polyline
+                                key={link.name}
+                                positions={link.positions}
+                                pathOptions={{
+                                  color: sel ? '#f59e0b' : '#0f766e',
+                                  weight: sel ? 8 : 3,
+                                  opacity: sel ? 1 : 0.72,
+                                  dashArray: sel ? undefined : '10 8',
+                                }}
+                                eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: link.name }) }}
+                              >
+                                <Tooltip>{link.name} · Link</Tooltip>
+                              </Polyline>
+                            );
+                          })}
+                          {transformerGeometries.map((transformer) => {
+                            const sel = analyticsFocus.type === 'branch' && analyticsFocus.key === transformer.name;
+                            return (
+                              <Polyline
+                                key={transformer.name}
+                                positions={transformer.positions}
+                                pathOptions={{
+                                  color: sel ? '#f59e0b' : '#f97316',
+                                  weight: sel ? 8 : 3,
+                                  opacity: sel ? 1 : 0.72,
+                                  dashArray: sel ? undefined : '8 6',
+                                }}
+                                eventHandlers={{ click: () => setAnalyticsFocus({ type: 'branch', key: transformer.name }) }}
+                              >
+                                <Tooltip>{transformer.name} · Transformer</Tooltip>
+                              </Polyline>
+                            );
+                          })}
+                          {model.buses.map((bus, index) => {
+                            const busName = stringValue(bus.name);
+                            const sel = analyticsFocus.type === 'bus' && analyticsFocus.key === busName;
+                            return (
+                              <CircleMarker
+                                key={`${busName}-analytics-${index}`}
+                                center={[numberValue(bus.y), numberValue(bus.x)]}
+                                radius={sel ? 12 : 8}
+                                pathOptions={{
+                                  color: sel ? '#f59e0b' : '#ffffff',
+                                  weight: sel ? 3 : 2,
+                                  fillColor: '#2563eb',
+                                  fillOpacity: 0.96,
+                                }}
+                                eventHandlers={{ click: () => setAnalyticsFocus({ type: 'bus', key: busName }) }}
+                              >
+                                <Tooltip>{busName} · Bus</Tooltip>
+                              </CircleMarker>
+                            );
+                          })}
                           {model.generators.map((generator, index) => {
                             const bus = busIndex[stringValue(generator.bus)];
                             if (!bus) return null;
                             const name = stringValue(generator.name);
+                            const sel = analyticsFocus.type === 'generator' && analyticsFocus.key === name;
                             return (
                               <CircleMarker
                                 key={`${name}-analytics-${index}`}
                                 center={[numberValue(bus.y) + 0.07, numberValue(bus.x) + 0.07]}
-                                radius={analyticsFocus.type === 'generator' && analyticsFocus.key === name ? 8 : 5}
+                                radius={sel ? 9 : 5}
                                 pathOptions={{
-                                  color: '#ffffff',
-                                  weight: 1.5,
+                                  color: sel ? '#f59e0b' : '#ffffff',
+                                  weight: sel ? 3 : 1.5,
                                   fillColor: carrierColor(stringValue(generator.carrier)),
-                                  fillOpacity: analyticsFocus.type === 'generator' && analyticsFocus.key === name ? 1 : 0.92,
+                                  fillOpacity: 0.96,
                                 }}
                                 eventHandlers={{ click: () => setAnalyticsFocus({ type: 'generator', key: name }) }}
                               >
@@ -2243,16 +2257,17 @@ function App() {
                             const bus = busIndex[stringValue(unit.bus)];
                             if (!bus) return null;
                             const name = stringValue(unit.name);
+                            const sel = analyticsFocus.type === 'storageUnit' && analyticsFocus.key === name;
                             return (
                               <CircleMarker
                                 key={`${name}-analytics-storage-${index}`}
                                 center={[numberValue(bus.y) - 0.07, numberValue(bus.x) + 0.05]}
-                                radius={analyticsFocus.type === 'storageUnit' && analyticsFocus.key === name ? 8 : 5}
+                                radius={sel ? 9 : 5}
                                 pathOptions={{
-                                  color: '#ffffff',
-                                  weight: 1.5,
+                                  color: sel ? '#f59e0b' : '#ffffff',
+                                  weight: sel ? 3 : 1.5,
                                   fillColor: '#14b8a6',
-                                  fillOpacity: analyticsFocus.type === 'storageUnit' && analyticsFocus.key === name ? 1 : 0.92,
+                                  fillOpacity: 0.96,
                                 }}
                                 eventHandlers={{ click: () => setAnalyticsFocus({ type: 'storageUnit', key: name }) }}
                               >

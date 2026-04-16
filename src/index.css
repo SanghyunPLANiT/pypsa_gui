@@ -912,16 +912,33 @@ button {
   height: 480px;
 }
 
+/* Suppress browser focus rectangle on clicked Leaflet SVG paths */
+.leaflet-interactive:focus,
+path.leaflet-interactive:focus {
+  outline: none !important;
+}
+
 .focus-chip {
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: rgba(248, 250, 252, 0.84);
+  gap: 6px;
+  align-items: center;
+}
+
+.focus-chip span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 
 .focus-chip strong {
-  font-size: 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand);
+  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 8px;
+  padding: 2px 8px;
 }
 
 .section-heading {
