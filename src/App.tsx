@@ -1413,6 +1413,10 @@ function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps)
     <div className="tables-layout">
       {/* ── Left nav ── */}
       <nav className="tables-nav">
+        <div className="nav-toolbar">
+          <button className="tb-btn" onClick={() => setCollapsed(new Set(TABLE_GROUPS.map((g) => g.sheet)))}>Collapse all</button>
+          <button className="tb-btn" onClick={() => setCollapsed(new Set())}>Expand all</button>
+        </div>
         {TABLE_GROUPS.map((g) => {
           const open = !collapsed.has(g.sheet);
           const tsRows: GridRow[] = g.tsSheet ? ((model as any)[g.tsSheet] as GridRow[]) ?? [] : [];
