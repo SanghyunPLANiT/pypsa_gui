@@ -1932,14 +1932,18 @@ path.leaflet-interactive:focus {
   border-radius: 10px;
   overflow: hidden;
 }
+.dashboard-section-header-row {
+  display: flex;
+  align-items: stretch;
+}
 .dashboard-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex: 1;
   padding: 12px 16px;
   cursor: pointer;
   user-select: none;
-  width: 100%;
   background: transparent;
   border: none;
   text-align: left;
@@ -1952,6 +1956,27 @@ path.leaflet-interactive:focus {
   color: var(--text);
 }
 .dashboard-section-body { padding: 0 4px 8px; }
+
+/* Export buttons */
+.chart-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+.chart-export-btn:hover {
+  color: var(--accent, #2563eb);
+  background: rgba(37, 99, 235, 0.05);
+}
 
 .dashboard-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
