@@ -3398,7 +3398,7 @@ function App() {
             </label>
             <div className="modal-actions">
               <button className="secondary-button" onClick={() => setRunDialogOpen(false)}>Cancel</button>
-              <button className="run-button" onClick={handleRunModel}>
+              <button className="run-button" onClick={() => handleRunModel()}>
                 {dryRun ? 'Validate' : 'Run model'}
               </button>
             </div>
