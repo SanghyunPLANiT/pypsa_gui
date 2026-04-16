@@ -17,6 +17,7 @@ import {
 } from './types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, EMPTY_METRIC_KEY } from './constants';
 import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer } from './utils/workbook';
+import { exportFullResults } from './utils/exportResults';
 import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './utils/analytics';
 import { DualRangeSlider } from './components/common/DualRangeSlider';
@@ -414,6 +415,14 @@ function App() {
                       .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
                       .catch(() => setStatus('Could not reload sample model.'));
                   }}>Demo</button>
+                  <button
+                    className="tb-btn sg-full"
+                    disabled={!results}
+                    title={results ? 'Export all inputs and outputs to Excel' : 'Run the model first to export results'}
+                    onClick={() => results && exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''))}
+                  >
+                    Export
+                  </button>
                 </div>
               </SidebarGroup>
 

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ChartSectionConfig, ChartSectionType, MetricOption, TimeframeOption } from '../../types';
-import { clamp } from '../../utils/helpers';
+import { clamp, numberValue } from '../../utils/helpers';
 import { aggregateMetricRows, buildDonutFromMetric } from '../../utils/analytics';
 import { EMPTY_METRIC_KEY } from '../../constants';
+import { exportChartToExcel } from '../../utils/exportChart';
 import { DonutChart } from './DonutChart';
 import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { TimelineSlider } from '../common/DualRangeSlider';
@@ -20,6 +21,7 @@ export function UserDefinedChartCard({
   onClean: () => void;
   onRemove: () => void;
 }) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
   const metric = metricOptions.find((item) => item.key === section.metricKey);
   const hasMetric = Boolean(metric);
   const metricRows = metric?.rows || [];
@@ -27,6 +29,25 @@ export function UserDefinedChartCard({
   const safeEnd = hasMetric ? clamp(Math.max(section.endIndex, safeStart), safeStart, Math.max(metricRows.length - 1, 0)) : 0;
   const aggregatedRows = hasMetric ? aggregateMetricRows(metric!, safeStart, safeEnd, section.timeframe) : [];
   const allowDonut = Boolean(metric?.allowDonut);
+
+  const handleExport = () => {
+    if (!metric) return;
+    if (section.chartType === 'donut') {
+      const donutData = buildDonutFromMetric(metric, safeStart, safeEnd);
+      const headers = ['label', 'value'];
+      const rows = donutData.map((d) => ({ label: d.label, value: d.value }));
+      exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
+    } else {
+      const seriesKeys = metric.series.map((s) => s.key);
+      const headers = ['timestamp', ...seriesKeys];
+      const rows = aggregatedRows.map((r) => {
+        const row: Record<string, unknown> = { timestamp: r.timestamp ?? r.label };
+        seriesKeys.forEach((k) => { row[k] = numberValue(r[k] as number | string | undefined); });
+        return row;
+      });
+      exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
+    }
+  };
 
   return (
     <section className="chart-card chart-builder-card">
@@ -36,6 +57,11 @@ export function UserDefinedChartCard({
           <p>{hasMetric ? metric!.unit : 'Select a value to render a chart.'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {hasMetric && (
+            <button className="ghost-button chart-export-btn" title="Export data and chart to Excel" onClick={handleExport}>
+              ⬇ Export
+            </button>
+          )}
           <button className="ghost-button" onClick={onClean}>Clean</button>
           <button className="ghost-button" style={{ color: '#dc2626' }} onClick={onRemove}>Remove</button>
         </div>
@@ -100,34 +126,36 @@ export function UserDefinedChartCard({
           onChange={(lo, hi) => onChange({ ...section, startIndex: lo, endIndex: hi })}
         />
       )}
-      {!hasMetric ? (
-        <div className="chart-empty-state">
-          <p className="empty-text">Choose a value, timeframe, and chart type for this section.</p>
-        </div>
-      ) : section.chartType === 'donut' ? (
-        <section className="chart-card">
-          <div className="chart-card-header">
-            <div>
-              <h3>{metric!.label}</h3>
-              <p>{`average ${metric!.unit} over selected time window`}</p>
-            </div>
+      <div ref={chartContainerRef}>
+        {!hasMetric ? (
+          <div className="chart-empty-state">
+            <p className="empty-text">Choose a value, timeframe, and chart type for this section.</p>
           </div>
-          {buildDonutFromMetric(metric!, safeStart, safeEnd).length > 0 ? (
-            <DonutChart data={buildDonutFromMetric(metric!, safeStart, safeEnd)} />
-          ) : (
-            <p className="empty-text">No aggregated values available for the current selection.</p>
-          )}
-        </section>
-      ) : (
-        <InteractiveTimeSeriesCard
-          title={metric!.label}
-          description={`${section.timeframe} ${metric!.unit}`}
-          data={aggregatedRows}
-          series={metric!.series}
-          mode={section.chartType}
-          stacked={section.stacked}
-        />
-      )}
+        ) : section.chartType === 'donut' ? (
+          <section className="chart-card">
+            <div className="chart-card-header">
+              <div>
+                <h3>{metric!.label}</h3>
+                <p>{`average ${metric!.unit} over selected time window`}</p>
+              </div>
+            </div>
+            {buildDonutFromMetric(metric!, safeStart, safeEnd).length > 0 ? (
+              <DonutChart data={buildDonutFromMetric(metric!, safeStart, safeEnd)} />
+            ) : (
+              <p className="empty-text">No aggregated values available for the current selection.</p>
+            )}
+          </section>
+        ) : (
+          <InteractiveTimeSeriesCard
+            title={metric!.label}
+            description={`${section.timeframe} ${metric!.unit}`}
+            data={aggregatedRows}
+            series={metric!.series}
+            mode={section.chartType}
+            stacked={section.stacked}
+          />
+        )}
+      </div>
     </section>
   );
 }
