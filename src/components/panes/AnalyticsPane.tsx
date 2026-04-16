@@ -7,7 +7,7 @@ import {
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor, loadingColor } from '../../utils/helpers';
 import { FitToBounds } from '../map/FitToBounds';
-import { LoadingLegend, MapLegend } from '../map/MapLegend';
+import { MapLegend } from '../map/MapLegend';
 import { SummaryCards } from '../common/SummaryCards';
 import { UserDefinedChartCard } from '../charts/UserDefinedChartCard';
 import { ResultsDashboard } from '../charts/ResultsDashboard';
@@ -238,7 +238,6 @@ export function AnalyticsPane({
             })}
           </MapContainer>
           <MapLegend carriers={uniqueCarriers} showLines={!hasLineLoading} />
-          <LoadingLegend show={hasLineLoading} />
         </div>
       </section>
 

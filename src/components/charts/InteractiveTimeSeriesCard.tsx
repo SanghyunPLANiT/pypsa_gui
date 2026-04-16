@@ -191,6 +191,7 @@ export function InteractiveTimeSeriesCard({
           </svg>
         </div>
         <div className="chart-legend chart-legend-side">
+          <div className="map-legend-title" style={{ marginBottom: 4 }}>Series</div>
           {visibleSeries.map((item) => (
             <div key={item.key} className="legend-item-inline">
               <span className="legend-swatch" style={{ backgroundColor: item.color }} />
