@@ -4,6 +4,7 @@ import { LatLngBoundsExpression } from 'leaflet';
 import { GridRow, WorkbookModel } from '../../types';
 import { numberValue, stringValue, carrierColor } from '../../utils/helpers';
 import { FitToBounds } from '../map/FitToBounds';
+import { MapLegend } from '../map/MapLegend';
 
 interface Props {
   model: WorkbookModel;
@@ -12,6 +13,9 @@ interface Props {
 }
 
 export function MapPane({ model, bounds, busIndex }: Props) {
+  const uniqueCarriers = Array.from(
+    new Set(model.generators.map((g) => stringValue(g.carrier)).filter(Boolean)),
+  );
   const lineGeometries = model.lines
     .map((line) => {
       const bus0 = busIndex[stringValue(line.bus0)];
@@ -64,7 +68,7 @@ export function MapPane({ model, bounds, busIndex }: Props) {
           <span>{model.transformers.length} transformers</span>
         </div>
       </div>
-      <div className="map-frame">
+      <div className="map-frame" style={{ position: 'relative' }}>
         <MapContainer center={[36.35, 127.9]} zoom={7} className="leaflet-map" scrollWheelZoom>
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -114,6 +118,7 @@ export function MapPane({ model, bounds, busIndex }: Props) {
             );
           })}
         </MapContainer>
+        <MapLegend carriers={uniqueCarriers} showLines />
       </div>
     </div>
   );

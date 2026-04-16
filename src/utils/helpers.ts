@@ -54,6 +54,29 @@ export function carrierColor(carrier: string): string {
   return CARRIER_COLORS[carrier] || CARRIER_COLORS.Other;
 }
 
+/**
+ * Map a line loading percentage (0–100+) to a colour on a
+ * green → yellow → red traffic-light scale.
+ */
+export function loadingColor(pct: number): string {
+  const t = Math.max(0, Math.min(1, pct / 100));
+  if (t <= 0.5) {
+    // green (#22c55e) → yellow (#f59e0b)
+    const u = t * 2;
+    const r = Math.round(34 + (245 - 34) * u);
+    const g = Math.round(197 + (158 - 197) * u);
+    const b = Math.round(94 + (11 - 94) * u);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    // yellow (#f59e0b) → red (#dc2626)
+    const u = (t - 0.5) * 2;
+    const r = Math.round(245 + (220 - 245) * u);
+    const g = Math.round(158 + (38 - 158) * u);
+    const b = Math.round(11 + (38 - 11) * u);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
 export function getBounds(model: WorkbookModel): LatLngBoundsExpression | null {
   const points = model.buses
     .map((bus) => [numberValue(bus.y), numberValue(bus.x)] as [number, number])
