@@ -1,5 +1,10 @@
 {
   "_comment": "Parameters for system-managed generators that the backend injects automatically. Edit here to adjust system generator behaviour without touching source code.",
+  "simulation": {
+    "max_snapshots": 8760,
+    "default_snapshot_count": 24,
+    "default_snapshot_weight": 1.0
+  },
   "grid_imports": {
     "carrier": "Imports",
     "p_nom_floor": 5000,

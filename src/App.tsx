@@ -10,7 +10,6 @@ import {
 import { LatLngBoundsExpression } from 'leaflet';
 import * as XLSX from 'xlsx';
 import 'leaflet/dist/leaflet.css';
-import sampleModelData from './data/sample_model.json';
 
 const SHEETS = [
   'network',
@@ -30,10 +29,21 @@ const SHEETS = [
   'processes',
 ] as const;
 
+// Time-series (_t) sheets: rows = timesteps, columns = component names
+const TS_SHEETS = [
+  'generators-p_max_pu',
+  'generators-p_min_pu',
+  'loads-p_set',
+  'storage_units-inflow',
+  'links-p_max_pu',
+] as const;
+
 type SheetName = (typeof SHEETS)[number];
+type TsSheetName = (typeof TS_SHEETS)[number];
+type AnySheetName = SheetName | TsSheetName;
 type Primitive = string | number | boolean | null;
 type GridRow = Record<string, Primitive>;
-type WorkspaceTab = 'Map' | 'Tables' | 'Analytics';
+type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Analytics';
 type BrowserFileHandle = any;
 type ChartMode = 'line' | 'area' | 'bar';
 type ChartSectionType = ChartMode | 'donut';
@@ -55,12 +65,14 @@ interface WorkbookModel {
   global_constraints: GridRow[];
   shapes: GridRow[];
   processes: GridRow[];
+  // Time-series sheets
+  'generators-p_max_pu': GridRow[];
+  'generators-p_min_pu': GridRow[];
+  'loads-p_set': GridRow[];
+  'storage_units-inflow': GridRow[];
+  'links-p_max_pu': GridRow[];
 }
 
-interface Selection {
-  sheet: SheetName;
-  rowIndex: number;
-}
 
 interface ScenarioSettings {
   caseName: string;
@@ -75,7 +87,8 @@ interface ScenarioSettings {
 }
 
 interface RunSettings {
-  snapshotCount: number;
+  snapshotStart: number;
+  snapshotEnd: number;
   snapshotWeight: number;
 }
 
@@ -372,13 +385,13 @@ const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
   },
 };
 
-// Carrier colors are defined in data/sample_model.json carriers[].color
-const CARRIER_COLORS: Record<string, string> = Object.fromEntries(
-  (sampleModelData.carriers as Array<{ name: string; color?: string }>)
-    .filter((c) => c.color)
-    .map((c) => [c.name, c.color as string]),
-);
-CARRIER_COLORS['Other'] = '#94a3b8';
+// Carrier colors (sourced from public/sample_model.xlsx carriers sheet)
+const CARRIER_COLORS: Record<string, string> = {
+  AC: '#475569', LNG: '#1f4e79', Coal: '#374151', Nuclear: '#7c3aed',
+  Solar: '#f59e0b', Wind: '#0f766e', Hydro: '#2563eb', Storage: '#14b8a6',
+  battery: '#0ea5e9', Imports: '#dc2626', LoadShedding: '#991b1b',
+  load: '#94a3b8', HVDC: '#6366f1', Other: '#94a3b8',
+};
 
 const DEFAULT_SCENARIO: ScenarioSettings = {
   caseName: 'Base Network',
@@ -393,13 +406,36 @@ const DEFAULT_SCENARIO: ScenarioSettings = {
 };
 
 const DEFAULT_RUN_SETTINGS: RunSettings = {
-  snapshotCount: 24,
+  snapshotStart: 0,
+  snapshotEnd: 24,
   snapshotWeight: 1,
 };
 
-function createDefaultWorkbook(): WorkbookModel {
-  // Source of truth: data/sample_model.json (mirrored to src/data/sample_model.json for bundling)
-  return sampleModelData as unknown as WorkbookModel;
+function createEmptyWorkbook(): WorkbookModel {
+  const base = Object.fromEntries(SHEETS.map((s) => [s, []]));
+  const ts = Object.fromEntries(TS_SHEETS.map((s) => [s, []]));
+  return { ...base, ...ts } as unknown as WorkbookModel;
+}
+
+function parseSheets(workbook: ReturnType<typeof XLSX.read>): WorkbookModel {
+  const model = createEmptyWorkbook();
+  const allSheets: AnySheetName[] = [...SHEETS, ...TS_SHEETS];
+  allSheets.forEach((sheet) => {
+    const ws = workbook.Sheets[sheet];
+    if (!ws) return;
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+    (model as any)[sheet] = rows.map((row) =>
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key, normalizeCell(value)])),
+    );
+  });
+  return model;
+}
+
+async function loadSampleWorkbook(): Promise<WorkbookModel> {
+  const res = await fetch('/sample_model.xlsx');
+  if (!res.ok) throw new Error('Could not load sample_model.xlsx');
+  const arrayBuffer = await res.arrayBuffer();
+  return parseSheets(XLSX.read(arrayBuffer, { type: 'array' }));
 }
 
 function normalizeCell(value: unknown): Primitive {
@@ -418,20 +454,8 @@ function parseWorkbook(file: File): Promise<WorkbookModel> {
           reject(new Error('Could not read workbook.'));
           return;
         }
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const nextModel = { ...createDefaultWorkbook() };
-        SHEETS.forEach((sheet) => {
-          const ws = workbook.Sheets[sheet];
-          if (!ws) {
-            nextModel[sheet] = [];
-            return;
-          }
-          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-          nextModel[sheet] = rows.map((row) =>
-            Object.fromEntries(Object.entries(row).map(([key, value]) => [key, normalizeCell(value)])),
-          );
-        });
-        resolve(nextModel);
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        resolve(parseSheets(wb));
       } catch (error) {
         reject(error instanceof Error ? error : new Error('Workbook import failed.'));
       }
@@ -447,6 +471,13 @@ function buildWorkbook(model: WorkbookModel) {
     const rows = model[sheet].length > 0 ? model[sheet] : [DEFAULT_SHEET_ROWS[sheet]];
     const ws = XLSX.utils.json_to_sheet(rows);
     XLSX.utils.book_append_sheet(workbook, ws, sheet);
+  });
+  TS_SHEETS.forEach((sheet) => {
+    const rows = (model as any)[sheet] as GridRow[];
+    if (rows && rows.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, ws, sheet);
+    }
   });
   return workbook;
 }
@@ -609,6 +640,46 @@ function SummaryCards({ items }: { items: SummaryItem[] }) {
   );
 }
 
+function DualRangeSlider({
+  min, max, low, high, step = 1,
+  formatLabel,
+  onChange,
+}: {
+  min: number; max: number; low: number; high: number; step?: number;
+  formatLabel?: (v: number) => string;
+  onChange: (low: number, high: number) => void;
+}) {
+  const pct = (v: number) => ((v - min) / (max - min)) * 100;
+  const fmt = formatLabel ?? String;
+  return (
+    <div className="dual-range">
+      <div className="dual-range-labels">
+        <span>{fmt(low)}</span>
+        <span>{fmt(high)}</span>
+      </div>
+      <div className="dual-range-track">
+        <div className="dual-range-fill" style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }} />
+        <input
+          type="range" min={min} max={max} step={step} value={low}
+          className="dual-range-input"
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            onChange(Math.min(v, high - step), high);
+          }}
+        />
+        <input
+          type="range" min={min} max={max} step={step} value={high}
+          className="dual-range-input"
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            onChange(low, Math.max(v, low + step));
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function DonutChart({ data }: { data: MixItem[] }) {
   const cx = 190, cy = 190, outerR = 168, innerR = 100;
   const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
@@ -691,30 +762,29 @@ function DonutChart({ data }: { data: MixItem[] }) {
   );
 }
 
-function GlobalTimelineControls({
+function TimelineSlider({
   data,
   startIndex,
   endIndex,
-  onStartChange,
-  onEndChange,
+  onChange,
 }: {
   data: Array<{ timestamp?: string }>;
   startIndex: number;
   endIndex: number;
-  onStartChange: (value: number) => void;
-  onEndChange: (value: number) => void;
+  onChange: (start: number, end: number) => void;
 }) {
   if (!data.length) return null;
+  const maxIdx = Math.max(data.length - 1, 0);
   return (
     <div className="chart-time-controls analytics-time-controls">
-      <label>
-        <span>Start</span>
-        <input type="range" min={0} max={Math.max(data.length - 1, 0)} value={startIndex} onChange={(event) => onStartChange(Number(event.target.value))} />
-      </label>
-      <label>
-        <span>End</span>
-        <input type="range" min={0} max={Math.max(data.length - 1, 0)} value={endIndex} onChange={(event) => onEndChange(Number(event.target.value))} />
-      </label>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <DualRangeSlider
+          min={0} max={maxIdx}
+          low={startIndex} high={endIndex}
+          formatLabel={(v) => formatTimestamp(data[v]?.timestamp) ?? String(v)}
+          onChange={(lo, hi) => onChange(lo, hi)}
+        />
+      </div>
       <div className="chart-window">
         <strong>{endIndex - startIndex + 1}</strong>
         <span>
@@ -1066,11 +1136,13 @@ function UserDefinedChartCard({
   metricOptions,
   onChange,
   onClean,
+  onRemove,
 }: {
   section: ChartSectionConfig;
   metricOptions: MetricOption[];
   onChange: (next: ChartSectionConfig) => void;
   onClean: () => void;
+  onRemove: () => void;
 }) {
   const metric = metricOptions.find((item) => item.key === section.metricKey);
   const hasMetric = Boolean(metric);
@@ -1087,9 +1159,10 @@ function UserDefinedChartCard({
           <h3>{hasMetric ? metric.label : 'Empty chart'}</h3>
           <p>{hasMetric ? metric.unit : 'Select a value to render a chart.'}</p>
         </div>
-        <button className="ghost-button" onClick={onClean}>
-          Clean
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="ghost-button" onClick={onClean}>Clean</button>
+          <button className="ghost-button" style={{ color: '#dc2626' }} onClick={onRemove}>Remove</button>
+        </div>
       </div>
       <div className="chart-builder-controls">
         <label className="chart-control">
@@ -1161,12 +1234,11 @@ function UserDefinedChartCard({
         )}
       </div>
       {hasMetric && (
-        <GlobalTimelineControls
+        <TimelineSlider
           data={metric.rows}
           startIndex={safeStart}
           endIndex={safeEnd}
-          onStartChange={(value) => onChange({ ...section, startIndex: Math.min(value, safeEnd) })}
-          onEndChange={(value) => onChange({ ...section, endIndex: Math.max(value, safeStart) })}
+          onChange={(lo, hi) => onChange({ ...section, startIndex: lo, endIndex: hi })}
         />
       )}
       {!hasMetric ? (
@@ -1212,26 +1284,265 @@ function EmptyAnalytics() {
   );
 }
 
+// ── Spreadsheet components ────────────────────────────────────────────────────
+
+interface SpreadsheetGridProps {
+  rows: GridRow[];
+  cols: string[];
+  readOnly?: boolean;
+  onUpdate?: (rowIndex: number, col: string, val: Primitive) => void;
+}
+
+function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: SpreadsheetGridProps) {
+  const [editCell, setEditCell] = useState<{ row: number; col: string; val: string } | null>(null);
+
+  if (rows.length === 0) return <div className="grid-empty">No data</div>;
+
+  return (
+    <div className="spreadsheet-scroll">
+      <table className="spreadsheet-table">
+        <thead>
+          <tr>
+            <th className="rn-col">#</th>
+            {cols.map((c) => <th key={c} title={c}>{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri}>
+              <td className="rn-col">{ri + 1}</td>
+              {cols.map((c) => {
+                const isEditing = !readOnly && editCell?.row === ri && editCell?.col === c;
+                return (
+                  <td
+                    key={c}
+                    className={isEditing ? 'cell-editing' : readOnly ? 'cell-readonly' : 'cell-editable'}
+                    onDoubleClick={() => {
+                      if (!readOnly) setEditCell({ row: ri, col: c, val: stringValue(row[c]) });
+                    }}
+                  >
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        className="cell-input"
+                        value={editCell!.val}
+                        onChange={(e) => setEditCell((prev) => prev ? { ...prev, val: e.target.value } : null)}
+                        onBlur={() => {
+                          if (editCell && onUpdate) onUpdate(ri, editCell.col, inferInputValue(editCell.val, row[editCell.col]));
+                          setEditCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'Tab') {
+                            if (editCell && onUpdate) onUpdate(ri, editCell.col, inferInputValue(editCell.val, row[editCell.col]));
+                            setEditCell(null);
+                          }
+                          if (e.key === 'Escape') setEditCell(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="cell-value">{stringValue(row[c])}</span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Tables two-panel layout ───────────────────────────────────────────────
+
+type TableSelKind = 'static' | 'ts';
+interface TableSel { kind: TableSelKind; sheet: AnySheetName }
+
+const TABLE_GROUPS: Array<{
+  label: string;
+  sheet: SheetName;
+  tsSheet?: TsSheetName;
+}> = [
+  { label: 'Network',           sheet: 'network' },
+  { label: 'Snapshots',         sheet: 'snapshots' },
+  { label: 'Carriers',          sheet: 'carriers' },
+  { label: 'Buses',             sheet: 'buses' },
+  { label: 'Generators',        sheet: 'generators',     tsSheet: 'generators-p_max_pu' },
+  { label: 'Loads',             sheet: 'loads',          tsSheet: 'loads-p_set' },
+  { label: 'Lines',             sheet: 'lines' },
+  { label: 'Links',             sheet: 'links',          tsSheet: 'links-p_max_pu' },
+  { label: 'Stores',            sheet: 'stores' },
+  { label: 'Storage Units',     sheet: 'storage_units',  tsSheet: 'storage_units-inflow' },
+  { label: 'Transformers',      sheet: 'transformers' },
+  { label: 'Shunt Impedances',  sheet: 'shunt_impedances' },
+  { label: 'Global Constraints',sheet: 'global_constraints' },
+];
+
+interface TablesPaneProps {
+  model: WorkbookModel;
+  onUpdate: (sheet: SheetName, rowIndex: number, col: string, val: Primitive) => void;
+  onAddRow: (sheet: SheetName) => void;
+  onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
+}
+
+function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps) {
+  const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (sheet: string) =>
+    setCollapsed((s) => { const n = new Set(s); n.has(sheet) ? n.delete(sheet) : n.add(sheet); return n; });
+
+  // Resolve current data
+  const isTs = sel.kind === 'ts';
+  const rows: GridRow[] = isTs
+    ? ((model as any)[sel.sheet] as GridRow[]) ?? []
+    : (model as any)[sel.sheet] ?? [];
+  const cols: string[] = rows.length > 0
+    ? (isTs ? Object.keys(rows[0]) : getColumns(rows, sel.sheet as SheetName))
+    : (isTs ? [] : getColumns([], sel.sheet as SheetName));
+
+  const parentGroup = isTs
+    ? TABLE_GROUPS.find((g) => g.tsSheet === sel.sheet)
+    : TABLE_GROUPS.find((g) => g.sheet === sel.sheet);
+
+  return (
+    <div className="tables-layout">
+      {/* ── Left nav ── */}
+      <nav className="tables-nav">
+        {TABLE_GROUPS.map((g) => {
+          const open = !collapsed.has(g.sheet);
+          const tsRows: GridRow[] = g.tsSheet ? ((model as any)[g.tsSheet] as GridRow[]) ?? [] : [];
+          const staticActive = sel.kind === 'static' && sel.sheet === g.sheet;
+          const tsActive = sel.kind === 'ts' && sel.sheet === g.tsSheet;
+          return (
+            <div key={g.sheet} className="nav-group">
+              <div className="nav-group-header" onClick={() => toggleGroup(g.sheet)}>
+                <span className={`nav-chevron${open ? ' open' : ''}`}>›</span>
+                <span className="nav-group-label">{g.label}</span>
+                <span className="nav-count">{model[g.sheet].length}</span>
+              </div>
+              {open && (
+                <div className="nav-items">
+                  <button
+                    className={`nav-item${staticActive ? ' active' : ''}`}
+                    onClick={() => setSel({ kind: 'static', sheet: g.sheet })}
+                  >
+                    <span className="nav-item-icon">≡</span>
+                    <span className="nav-item-label">static</span>
+                    <span className="nav-count">{model[g.sheet].length}</span>
+                  </button>
+                  {g.tsSheet && (
+                    <button
+                      className={`nav-item ts-item${tsActive ? ' active' : ''}`}
+                      onClick={() => setSel({ kind: 'ts', sheet: g.tsSheet! })}
+                    >
+                      <span className="nav-item-icon">⏱</span>
+                      <span className="nav-item-label">temporal</span>
+                      <span className={`nav-count${tsRows.length > 0 ? ' has-data' : ''}`}>
+                        {tsRows.length > 0 ? `${tsRows.length}t` : '—'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* ── Main content ── */}
+      <div className="tables-content">
+        <div className="tables-content-header">
+          <div>
+            <p className="eyebrow">{isTs ? 'Temporal (_t)' : 'Static'}</p>
+            <h2>{parentGroup?.label ?? sel.sheet} <span className="sheet-name-chip">{sel.sheet}</span></h2>
+          </div>
+          <div className="inline-stats">
+            <span>{rows.length} rows</span>
+            {cols.length > 0 && <span>{cols.length} cols</span>}
+            {isTs && <span className="ts-chip">read-only · double-click to inspect</span>}
+          </div>
+        </div>
+
+        {!isTs && (
+          <div className="section-toolbar">
+            <button className="ghost-button sm" onClick={() => onAddRow(sel.sheet as SheetName)}>+ Row</button>
+            {rows.length > 0 && (
+              <button className="ghost-button sm danger" onClick={() => onDeleteRow(sel.sheet as SheetName, rows.length - 1)}>
+                − Last row
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="tables-grid-wrap">
+          {rows.length === 0
+            ? <div className="grid-empty">{isTs ? 'No temporal data in this sheet.' : 'No rows yet — use "+ Row" to add one.'}</div>
+            : <SpreadsheetGrid
+                rows={rows}
+                cols={cols}
+                readOnly={isTs}
+                onUpdate={isTs ? undefined : (ri, col, val) => onUpdate(sel.sheet as SheetName, ri, col, val)}
+              />
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Derive the max snapshot count exclusively from the workbook's snapshots sheet.
+ *  'now' or empty → 1 (static single-period model).
+ *  Real datetime rows → their count.
+ *  Never fall back to a config value — the workbook is the only source of truth. */
+function snapshotMaxFromWorkbook(rows: GridRow[]): number {
+  if (!rows || rows.length === 0) return 1;
+  if (rows.length === 1) {
+    const label = String(
+      rows[0].snapshot ?? rows[0].name ?? rows[0].datetime ?? ''
+    ).trim().toLowerCase();
+    if (label === 'now' || label === '') return 1;
+  }
+  return rows.length;
+}
+
 function App() {
-  const [model, setModel] = useState<WorkbookModel>(() => createDefaultWorkbook());
+  const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
   const [tab, setTab] = useState<WorkspaceTab>('Map');
-  const [activeSheet, setActiveSheet] = useState<SheetName>('buses');
-  const [selection, setSelection] = useState<Selection | null>({ sheet: 'buses', rowIndex: 0 });
   const [scenario] = useState<ScenarioSettings>(DEFAULT_SCENARIO);
   const [runSettings, setRunSettings] = useState<RunSettings>(DEFAULT_RUN_SETTINGS);
+  const [maxSnapshots, setMaxSnapshots] = useState<number>(1);
   const [results, setResults] = useState<RunResults | null>(null);
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [validateResult, setValidateResult] = useState<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    notes: string[];
+    snapshotCount: number;
+    networkSummary: Record<string, number>;
+  } | null>(null);
   const [status, setStatus] = useState('Ready. Import a workbook or edit the demo model.');
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
   const [filename, setFilename] = useState('pypsa_studio_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    loadSampleWorkbook().then((sampleModel) => {
+      if (!sampleModel) return;
+      const snapshotMax = snapshotMaxFromWorkbook(sampleModel.snapshots);
+      setMaxSnapshots(snapshotMax);
+      setModel(sampleModel);
+      setRunSettings((s) => ({ ...s, snapshotEnd: Math.min(s.snapshotEnd, snapshotMax) }));
+    }).catch(() => null);
+  }, []);
+
+
   const bounds = getBounds(model);
   const busIndex = getBusIndex(model);
-  const sheetColumns = getColumns(model[activeSheet], activeSheet);
-  const activeRows = model[activeSheet];
 
   useEffect(() => {
     if (!results) {
@@ -1248,15 +1559,24 @@ function App() {
   }, [results, analyticsFocus]);
 
 
+  const resetForNewModel = (nextModel: WorkbookModel, name?: string) => {
+    const snapshotMax = snapshotMaxFromWorkbook(nextModel.snapshots);
+    setMaxSnapshots(snapshotMax);
+    setModel(nextModel);
+    setResults(null);
+    setChartSections([]);
+    setValidateResult(null);
+    setAnalyticsFocus({ type: 'system' });
+    setRunSettings({ ...DEFAULT_RUN_SETTINGS, snapshotEnd: Math.min(DEFAULT_RUN_SETTINGS.snapshotEnd, snapshotMax) });
+    if (name) setFilename(name);
+  };
+
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const nextModel = await parseWorkbook(file);
-      setModel(nextModel);
-      setActiveSheet('buses');
-      setSelection(nextModel.buses.length > 0 ? { sheet: 'buses', rowIndex: 0 } : null);
-      setFilename(file.name || 'pypsa_studio_case.xlsx');
+      resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
       setFileHandle(null);
       setResults(null);
       setStatus(`Imported workbook: ${file.name}. Analytics will populate after the next run.`);
@@ -1281,12 +1601,8 @@ function App() {
       });
       const file = await handle.getFile();
       const nextModel = await parseWorkbook(file);
-      setModel(nextModel);
-      setActiveSheet('buses');
-      setSelection(nextModel.buses.length > 0 ? { sheet: 'buses', rowIndex: 0 } : null);
+      resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
       setFileHandle(handle);
-      setFilename(file.name || 'pypsa_studio_case.xlsx');
-      setResults(null);
       setStatus(`Opened workbook: ${file.name}`);
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') setStatus('Workbook open failed.');
@@ -1303,48 +1619,17 @@ function App() {
   const addRow = (sheet: SheetName) => {
     setModel((current) => {
       const nextRows = [...current[sheet], { ...DEFAULT_SHEET_ROWS[sheet] }];
-      const nextIndex = nextRows.length - 1;
-      setSelection({ sheet, rowIndex: nextIndex });
-      setActiveSheet(sheet);
       return { ...current, [sheet]: nextRows };
     });
     setStatus(`Added a new row to ${sheet}.`);
   };
 
-  const deleteSelectedRow = () => {
-    if (!selection) return;
+  const deleteRow = (sheet: SheetName, rowIndex: number) => {
     setModel((current) => {
-      const nextRows = current[selection.sheet].filter((_, index) => index !== selection.rowIndex);
-      return { ...current, [selection.sheet]: nextRows };
+      const nextRows = current[sheet].filter((_, i) => i !== rowIndex);
+      return { ...current, [sheet]: nextRows };
     });
-    setSelection(null);
-    setStatus(`Removed selected row from ${selection.sheet}.`);
-  };
-
-  const addColumn = () => {
-    const name = window.prompt('New column name');
-    if (!name?.trim()) return;
-    const key = name.trim();
-    setModel((current) => ({
-      ...current,
-      [activeSheet]: current[activeSheet].map((row) => ({ ...row, [key]: row[key] ?? '' })),
-    }));
-    setStatus(`Added column ${key} to ${activeSheet}.`);
-  };
-
-  const deleteColumn = () => {
-    const name = window.prompt('Column name to delete');
-    if (!name?.trim()) return;
-    const key = name.trim();
-    setModel((current) => ({
-      ...current,
-      [activeSheet]: current[activeSheet].map((row) => {
-        const next = { ...row };
-        delete next[key];
-        return next;
-      }),
-    }));
-    setStatus(`Deleted column ${key} from ${activeSheet}.`);
+    setStatus(`Removed row ${rowIndex + 1} from ${sheet}.`);
   };
 
   const saveAsWorkbook = async () => {
@@ -1388,14 +1673,47 @@ function App() {
     }
   };
 
+  const buildRunOptions = () => {
+    const snapshotCount = runSettings.snapshotEnd - runSettings.snapshotStart;
+    return {
+      model,
+      scenario,
+      options: {
+        snapshotCount,
+        snapshotStart: runSettings.snapshotStart,
+        snapshotWeight: runSettings.snapshotWeight,
+      },
+    };
+  };
+
   const handleRunModel = async () => {
     setRunDialogOpen(false);
-    setStatus(`Running ${scenario.caseName} with ${runSettings.snapshotCount} snapshots at ${runSettings.snapshotWeight} h weighting...`);
+    const snapshotCount = runSettings.snapshotEnd - runSettings.snapshotStart;
+
+    if (dryRun) {
+      setStatus('Validating model structure...');
+      try {
+        const response = await fetch(`${API_BASE}/api/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildRunOptions()),
+        });
+        const result = await response.json();
+        setValidateResult(result);
+        setTab('Validation');
+        setStatus(result.valid ? 'Validation passed — model structure is valid.' : `Validation failed: ${result.errors.length} error(s).`);
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Validation request failed.');
+      }
+      return;
+    }
+
+    setStatus(`Running ${scenario.caseName} with ${snapshotCount} snapshots at ${runSettings.snapshotWeight} h weighting...`);
     try {
       const response = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, scenario, options: runSettings }),
+        body: JSON.stringify(buildRunOptions()),
       });
       if (!response.ok) {
         const message = await response.text();
@@ -1605,86 +1923,41 @@ function App() {
   return (
     <div className="studio-shell">
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleImport} />
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div>
-            <p className="eyebrow">PyPSA Studio</p>
-            <h1>Standalone Planning Workbench</h1>
-          </div>
-          <button className="ghost-button" onClick={() => { setModel(createDefaultWorkbook()); setResults(null); }}>
-            Reset Demo
-          </button>
-        </div>
-
-        <div className="sidebar-section">
-          <div className="panel-title-row">
-            <h2>Workbook</h2>
-            <button className="ghost-button" onClick={handleOpenWorkbook}>
-              Open
-            </button>
-          </div>
-          <div className="sheet-list">
-            {SHEETS.map((sheet) => (
-              <button
-                key={sheet}
-                className={`sheet-item ${activeSheet === sheet ? 'is-active' : ''}`}
-                onClick={() => {
-                  setActiveSheet(sheet);
-                  setTab('Tables');
-                  setSelection(model[sheet].length > 0 ? { sheet, rowIndex: 0 } : null);
-                }}
-              >
-                <span>{sheet}</span>
-                <strong>{model[sheet].length}</strong>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sidebar-section">
-          <h2>Run Setup</h2>
-          <div className="summary-metrics">
-            <div className="metric-card">
-              <span>Snapshots</span>
-              <strong>{runSettings.snapshotCount}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Weight</span>
-              <strong>{runSettings.snapshotWeight} h</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="sidebar-section">
-          <h2>Status</h2>
-          <p className="status-text">{status}</p>
-        </div>
-      </aside>
 
       <main className="workspace">
         <header className="topbar">
-          <div className="topbar-main">
-            <button className="run-button" onClick={() => setRunDialogOpen(true)}>
-              Run
-            </button>
-            <button className="secondary-button" onClick={handleOpenWorkbook}>
-              Open
-            </button>
-            <button className="secondary-button" onClick={saveWorkbook}>
-              Save
-            </button>
-            <button className="secondary-button" onClick={saveAsWorkbook}>
-              Save As
-            </button>
+          <div className="topbar-left">
+            <span className="topbar-brand">PyPSA Studio</span>
+            <div className="topbar-divider" />
+            <button className="run-button" onClick={() => setRunDialogOpen(true)}>Run</button>
+            <div className="topbar-file-ops">
+              <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
+              <button className="tb-btn" onClick={() => fileInputRef.current?.click()}>Import</button>
+              <button className="tb-btn" onClick={saveWorkbook}>Save</button>
+              <button className="tb-btn" onClick={saveAsWorkbook}>Save As</button>
+              <button className="tb-btn tb-btn--muted" onClick={() => {
+                loadSampleWorkbook()
+                  .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
+                  .catch(() => setStatus('Could not reload sample model.'));
+              }}>Demo</button>
+            </div>
             <div className="case-chip">
               <span>Workbook</span>
               <strong>{filename}</strong>
             </div>
+            <span className="topbar-status" title={status}>{status}</span>
           </div>
           <nav className="tab-nav">
-            {(['Map', 'Tables', 'Analytics'] as WorkspaceTab[]).map((item) => (
-              <button key={item} className={`tab-button ${tab === item ? 'is-active' : ''}`} onClick={() => setTab(item)}>
+            {(['Map', 'Tables', 'Validation', 'Analytics'] as WorkspaceTab[]).map((item) => (
+              <button
+                key={item}
+                className={`tab-button ${tab === item ? 'is-active' : ''} ${item === 'Validation' && validateResult && !validateResult.valid ? 'tab-button--error' : ''} ${item === 'Validation' && validateResult && validateResult.valid ? 'tab-button--ok' : ''}`}
+                onClick={() => setTab(item)}
+              >
                 {item}
+                {item === 'Validation' && validateResult && (
+                  <span className="tab-badge">{validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -1732,9 +2005,9 @@ function App() {
                       <CircleMarker
                         key={`${stringValue(bus.name)}-${index}`}
                         center={[numberValue(bus.y), numberValue(bus.x)]}
-                        radius={selection?.sheet === 'buses' && selection.rowIndex === index ? 10 : 8}
+                        radius={8}
                         pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 0.95 }}
-                        eventHandlers={{ click: () => { setSelection({ sheet: 'buses', rowIndex: index }); setActiveSheet('buses'); } }}
+                        eventHandlers={{ click: () => setTab('Tables') }}
                       >
                         <Tooltip sticky>
                           <strong>{stringValue(bus.name)}</strong>
@@ -1752,7 +2025,7 @@ function App() {
                           center={[numberValue(bus.y) + 0.07, numberValue(bus.x) + 0.07]}
                           radius={5}
                           pathOptions={{ color: '#ffffff', weight: 1.5, fillColor: carrierColor(stringValue(generator.carrier)), fillOpacity: 0.95 }}
-                          eventHandlers={{ click: () => { setSelection({ sheet: 'generators', rowIndex: index }); setActiveSheet('generators'); } }}
+                          eventHandlers={{ click: () => setTab('Tables') }}
                         >
                           <Tooltip>{stringValue(generator.name)} · {stringValue(generator.carrier)} · {Math.round(numberValue(generator.p_nom))} MW</Tooltip>
                         </CircleMarker>
@@ -1764,50 +2037,88 @@ function App() {
             )}
 
             {tab === 'Tables' && (
-              <div className="pane">
-                <div className="pane-header">
-                  <div>
-                    <p className="eyebrow">Component Sheet</p>
-                    <h2>{activeSheet}</h2>
+              <div className="pane tables-pane">
+                <TablesPane
+                  model={model}
+                  onUpdate={updateRowValue}
+                  onAddRow={addRow}
+                  onDeleteRow={deleteRow}
+                />
+              </div>
+            )}
+
+            {tab === 'Validation' && (
+              <div className="pane validation-pane">
+                {!validateResult ? (
+                  <div className="validation-empty">
+                    <p className="eyebrow">Validation</p>
+                    <h2>No validation result yet</h2>
+                    <p className="status-text" style={{ marginTop: 8 }}>
+                      Open <strong>Run</strong> → check <strong>Dry run</strong> → click <strong>Validate</strong> to check the model structure.
+                    </p>
+                    <button className="run-button" style={{ marginTop: 18 }} onClick={() => { setDryRun(true); setRunDialogOpen(true); }}>
+                      Validate now
+                    </button>
                   </div>
-                  <div className="inline-stats">
-                    <span>{model[activeSheet].length} records</span>
-                    <span>{sheetColumns.length} fields</span>
-                  </div>
-                </div>
-                <div className="sheet-toolbar">
-                  <button className="ghost-button" onClick={() => addRow(activeSheet)}>Add Row</button>
-                  <button className="ghost-button" onClick={deleteSelectedRow} disabled={!selection}>Delete Row</button>
-                  <button className="ghost-button" onClick={addColumn}>Add Column</button>
-                  <button className="ghost-button" onClick={deleteColumn}>Delete Column</button>
-                </div>
-                <div className="table-wrap">
-                  <table className="data-table sheet-table">
-                    <thead>
-                      <tr>{sheetColumns.map((column) => <th key={column}>{column}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {activeRows.map((row, rowIndex) => (
-                        <tr
-                          key={`${activeSheet}-${rowIndex}`}
-                          className={selection?.sheet === activeSheet && selection.rowIndex === rowIndex ? 'is-selected' : ''}
-                          onClick={() => setSelection({ sheet: activeSheet, rowIndex })}
-                        >
-                          {sheetColumns.map((column) => (
-                            <td key={column}>
-                              <input
-                                value={stringValue(row[column])}
-                                onChange={(event) =>
-                                  updateRowValue(activeSheet, rowIndex, column, inferInputValue(event.target.value, row[column]))
-                                }
-                              />
-                            </td>
+                ) : (
+                  <div className="validation-report">
+                    <div className="validation-report-header">
+                      <div>
+                        <p className="eyebrow">Validation report</p>
+                        <h2 className={validateResult.valid ? 'text-ok' : 'text-error'}>
+                          {validateResult.valid ? 'Passed' : 'Failed'}
+                        </h2>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-start', marginTop: 4 }}>
+                        <button className="tb-btn" onClick={() => { setDryRun(true); setRunDialogOpen(true); }}>Re-validate</button>
+                        {validateResult.valid && (
+                          <button className="run-button" onClick={() => { setDryRun(false); setRunDialogOpen(true); }}>Run model</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {validateResult.errors.length > 0 && (
+                      <div className="validation-section validation-section--error">
+                        <p className="validation-section-title">Errors ({validateResult.errors.length})</p>
+                        <ul className="validation-list">
+                          {validateResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {validateResult.warnings.length > 0 && (
+                      <div className="validation-section validation-section--warn">
+                        <p className="validation-section-title">Warnings ({validateResult.warnings.length})</p>
+                        <ul className="validation-list">
+                          {validateResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {Object.keys(validateResult.networkSummary).length > 0 && (
+                      <div className="validation-section">
+                        <p className="validation-section-title">Network summary</p>
+                        <div className="validation-summary-grid">
+                          {Object.entries(validateResult.networkSummary).map(([k, v]) => (
+                            <div key={k} className="metric-card">
+                              <span>{k}</span>
+                              <strong>{v}</strong>
+                            </div>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {validateResult.notes.length > 0 && (
+                      <div className="validation-section">
+                        <p className="validation-section-title">Build notes</p>
+                        <ul className="validation-list validation-list--notes">
+                          {validateResult.notes.map((n, i) => <li key={i}>{n}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2038,6 +2349,9 @@ function App() {
                                 ),
                               )
                             }
+                            onRemove={() =>
+                              setChartSections((current) => current.filter((item) => item.id !== section.id))
+                            }
                           />
                         ))}
                       </div>
@@ -2068,43 +2382,64 @@ function App() {
                 <h2>Run configuration</h2>
               </div>
             </div>
-            <div className="run-settings-grid">
-              <label className="field">
-                <span>Number of snapshots</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={336}
-                  value={runSettings.snapshotCount}
-                  onChange={(event) =>
-                    setRunSettings((current) => ({ ...current, snapshotCount: clamp(Number(event.target.value) || 1, 1, 336) }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Snapshot weight (hours)</span>
-                <input
-                  type="number"
-                  min={0.1}
-                  step={0.1}
-                  value={runSettings.snapshotWeight}
-                  onChange={(event) =>
-                    setRunSettings((current) => ({ ...current, snapshotWeight: Math.max(0.1, Number(event.target.value) || 0.1) }))
-                  }
-                />
-              </label>
-            </div>
-            <p className="status-text">
-              Snapshot weighting changes the modeled period and the backend rescales period-dependent constraints such as `e_sum_min`,
-              `e_sum_max`, and energy-style global constraints.
-            </p>
+            {maxSnapshots <= 1 ? (
+              <div className="run-static-notice">
+                <strong>Static single-period model</strong>
+                <p>The workbook defines 1 snapshot (<code>now</code>). This runs as a single dispatch period.</p>
+              </div>
+            ) : (
+              <>
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                    Simulation window — <strong>{runSettings.snapshotEnd - runSettings.snapshotStart} snapshots</strong>
+                    {' '}(snapshot {runSettings.snapshotStart} → {runSettings.snapshotEnd} of {maxSnapshots})
+                  </span>
+                  <DualRangeSlider
+                    min={0} max={maxSnapshots}
+                    low={runSettings.snapshotStart} high={runSettings.snapshotEnd}
+                    formatLabel={(v) => `${v}`}
+                    onChange={(lo, hi) => setRunSettings((s) => ({ ...s, snapshotStart: lo, snapshotEnd: hi }))}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                    Snapshot weight — <strong>{runSettings.snapshotWeight} h/snapshot</strong>
+                    {' '}({((runSettings.snapshotEnd - runSettings.snapshotStart) * runSettings.snapshotWeight).toFixed(0)} modeled hours)
+                  </span>
+                  <DualRangeSlider
+                    min={0} max={24}
+                    low={0} high={runSettings.snapshotWeight}
+                    step={0.5}
+                    formatLabel={(v) => `${v}h`}
+                    onChange={(_lo, hi) => setRunSettings((s) => ({ ...s, snapshotWeight: Math.max(0.5, hi) }))}
+                  />
+                </div>
+                <p className="status-text" style={{ marginBottom: 12 }}>
+                  Weighting rescales period-dependent constraints (e_sum_min, e_sum_max) proportionally.
+                </p>
+              </>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={dryRun}
+                onChange={(e) => setDryRun(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.9rem' }}>
+                <strong>Dry run</strong> — validate model structure without optimising
+              </span>
+            </label>
             <div className="modal-actions">
               <button className="secondary-button" onClick={() => setRunDialogOpen(false)}>Cancel</button>
-              <button className="run-button" onClick={handleRunModel}>Run model</button>
+              <button className="run-button" onClick={handleRunModel}>
+                {dryRun ? 'Validate' : 'Run model'}
+              </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
