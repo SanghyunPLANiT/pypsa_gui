@@ -2580,7 +2580,7 @@ function App() {
     const snapshotCount = sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart;
     const runOptions = {
       model,
-      scenario: { ...sc.params, constraints: constraints.filter((c) => c.enabled) },
+      scenario: { constraints: constraints.filter((c) => c.enabled) },
       options: {
         snapshotCount,
         snapshotStart: sc.runSettings.snapshotStart,
@@ -2885,24 +2885,7 @@ function App() {
                 </div>
               </SidebarGroup>
 
-              <SidebarGroup title="Model" icon="⚙" defaultOpen>
-                <div className="sg-params">
-                  {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step, tooltip }) => (
-                    <div key={key} className="sg-param-row" title={tooltip}>
-                      <div className="sg-param-label">
-                        <span>{label}</span>
-                        <span className="sg-param-val">{scenario[key]}{unit}</span>
-                      </div>
-                      <input
-                        type="range" className="sg-slider"
-                        min={min} max={max} step={step}
-                        value={Number(scenario[key])}
-                        onChange={(e) => handleUpdateScenarioParam(activeId, key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </SidebarGroup>
+              {/* Model/scenario param sliders archived — not connected to backend */}
 
               <SidebarGroup
                 title="Constraints" icon="⛓"
