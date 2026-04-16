@@ -1900,3 +1900,65 @@ path.leaflet-interactive:focus {
 .sc-status--done    { background: #dcfce7; color: #16a34a; }
 .sc-status--error   { background: #fee2e2; color: #dc2626; }
 
+/* ── Results dashboard ────────────────────────────────────────────────────── */
+.results-dashboard { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+.kpi-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.kpi-card .kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+  margin: 4px 0 2px;
+}
+.kpi-card .kpi-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.kpi-card .kpi-unit { font-size: 0.8rem; color: var(--muted); }
+.kpi-card--green .kpi-value { color: #16a34a; }
+
+.dashboard-section {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.dashboard-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+}
+.dashboard-section-header:hover { background: rgba(0,0,0,0.02); }
+.dashboard-section-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.dashboard-section-body { padding: 0 4px 8px; }
+
+.dashboard-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.duration-curve-card { padding: 8px; }
+
+@media (max-width: 860px) {
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-row { grid-template-columns: 1fr; }
+}
+

@@ -118,6 +118,32 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         if v > 0.0
     ]
 
+    # Cost breakdown
+    fuel_cost = 0.0
+    carbon_cost = 0.0
+    shed_cost = 0.0
+    for name in network.generators.index:
+        if name not in generator_dispatch_frame.columns:
+            continue
+        mc = float(network.generators.at[name, "marginal_cost"])
+        dispatch_mwh = weighted_sum(generator_dispatch_frame[name].clip(lower=0.0), generator_weights)
+        carrier = network.generators.at[name, "carrier"]
+        ef = emissions_factors.get(carrier, 0.0)
+        carbon_c = float(scenario.get("carbonPrice", 0.0))
+        carbon_component = dispatch_mwh * ef * carbon_c
+        fuel_component = dispatch_mwh * max(0.0, mc - ef * carbon_c)
+        if name.startswith("load_shedding_"):
+            shed_cost += dispatch_mwh * mc
+        else:
+            fuel_cost += fuel_component
+            carbon_cost += carbon_component
+
+    cost_breakdown = [
+        {"label": "Fuel cost", "value": round(fuel_cost)},
+        {"label": "Carbon cost", "value": round(carbon_cost)},
+        {"label": "Load shedding", "value": round(shed_cost)},
+    ]
+
     # Series
     dispatch_s, gen_dispatch_s = build_dispatch_series(network, by_carrier, load_dispatch, generator_dispatch_frame)
     price_s, emissions_s = build_price_emissions_series(network, by_carrier, price_series, emissions_factors)
@@ -180,6 +206,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         "systemEmissionsSeries": emissions_s,
         "storageSeries": storage_s,
         "carrierMix": carrier_mix,
+        "costBreakdown": cost_breakdown,
         "nodalBalance": nodal_balance,
         "lineLoading": line_loading,
         "narrative": notes,

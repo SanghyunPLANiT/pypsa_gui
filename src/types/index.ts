@@ -160,6 +160,7 @@ export interface RunResults {
   systemEmissionsSeries: ValuePoint[];
   storageSeries: StoragePoint[];
   carrierMix: MixItem[];
+  costBreakdown: Array<{ label: string; value: number }>;
   nodalBalance: Array<{ label: string; load: number; generation: number }>;
   lineLoading: Array<{ label: string; value: number }>;
   narrative: string[];
