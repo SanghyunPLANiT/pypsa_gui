@@ -166,7 +166,7 @@ export function InteractiveTimeSeriesCard({
               const hx = xForIndex(hoverIndex);
               const row = visible[hoverIndex];
               const tooltipItems = visibleSeries.map((s) => ({ label: s.label, color: s.color, value: numberValue(row[s.key] as string | number | undefined) }));
-              const tipWidth = 180, tipHeight = 8 + tooltipItems.length * 18;
+              const tipWidth = 180, tipHeight = 16 + tooltipItems.length * 18;
               const tx = hx + 12 + tipWidth > width - padding ? hx - tipWidth - 12 : hx + 12;
               const ty = Math.max(padding, padding + 4);
               return (
@@ -175,7 +175,7 @@ export function InteractiveTimeSeriesCard({
                   <g transform={`translate(${tx},${ty})`}>
                     <rect rx="7" ry="7" width={tipWidth} height={tipHeight} fill="rgba(15,23,42,0.88)" />
                     {tooltipItems.map((item, i) => (
-                      <g key={item.label} transform={`translate(10,${10 + i * 18})`}>
+                      <g key={item.label} transform={`translate(10,${18 + i * 18})`}>
                         <rect x="0" y="-8" width="8" height="8" rx="2" fill={item.color} />
                         <text x="12" y="0" fill="white" fontSize="11" fontFamily="IBM Plex Sans, sans-serif">
                           {item.label}: <tspan fontWeight="700">{Math.round(item.value).toLocaleString()}</tspan>
