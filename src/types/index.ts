@@ -1,0 +1,226 @@
+import { SHEETS, TS_SHEETS } from '../constants/sheets';
+
+// ── Sheet name types ──────────────────────────────────────────────────────────
+
+export type SheetName = (typeof SHEETS)[number];
+export type TsSheetName = (typeof TS_SHEETS)[number];
+export type AnySheetName = SheetName | TsSheetName;
+
+// ── Primitives ────────────────────────────────────────────────────────────────
+
+export type Primitive = string | number | boolean | null;
+export type GridRow = Record<string, Primitive>;
+export type BrowserFileHandle = any;
+
+// ── UI state ──────────────────────────────────────────────────────────────────
+
+export type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Analytics';
+export type ChartMode = 'line' | 'area' | 'bar';
+export type ChartSectionType = ChartMode | 'donut';
+export type TimeframeOption = 'aggregated' | 'yearly' | 'monthly' | 'weekly' | 'daily' | 'hourly';
+
+export type ConstraintMetric =
+  | 'co2_cap' | 're_share' | 'max_load_shed'
+  | 'carrier_max_gen' | 'carrier_min_gen'
+  | 'carrier_max_share' | 'carrier_min_share';
+
+// ── Domain model ──────────────────────────────────────────────────────────────
+
+export interface WorkbookModel {
+  network: GridRow[];
+  snapshots: GridRow[];
+  carriers: GridRow[];
+  buses: GridRow[];
+  generators: GridRow[];
+  loads: GridRow[];
+  links: GridRow[];
+  lines: GridRow[];
+  stores: GridRow[];
+  storage_units: GridRow[];
+  transformers: GridRow[];
+  shunt_impedances: GridRow[];
+  global_constraints: GridRow[];
+  shapes: GridRow[];
+  processes: GridRow[];
+  'generators-p_max_pu': GridRow[];
+  'generators-p_min_pu': GridRow[];
+  'loads-p_set': GridRow[];
+  'storage_units-inflow': GridRow[];
+  'links-p_max_pu': GridRow[];
+}
+
+export interface CustomConstraint {
+  id: string;
+  enabled: boolean;
+  label: string;
+  metric: ConstraintMetric;
+  carrier: string;
+  value: number;
+  unit: string;
+}
+
+// ── Result types ──────────────────────────────────────────────────────────────
+
+export interface SummaryItem {
+  label: string;
+  value: string;
+  detail: string;
+}
+
+export interface SeriesPoint {
+  label: string;
+  timestamp: string;
+  values: Record<string, number>;
+  total?: number;
+}
+
+export interface ValuePoint {
+  label: string;
+  timestamp?: string;
+  value: number;
+}
+
+export interface StoragePoint {
+  label: string;
+  timestamp: string;
+  charge: number;
+  discharge: number;
+  state: number;
+}
+
+export interface MixItem {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface GeneratorDetail {
+  name: string;
+  carrier: string;
+  bus: string;
+  summary: SummaryItem[];
+  outputSeries: Array<{ label: string; timestamp: string; output: number }>;
+  emissionsSeries: Array<{ label: string; timestamp: string; emissions: number }>;
+  availableSeries: Array<{ label: string; timestamp: string; available: number }>;
+  curtailmentSeries: Array<{ label: string; timestamp: string; curtailment: number }>;
+}
+
+export interface BusDetail {
+  name: string;
+  summary: SummaryItem[];
+  netSeries: Array<{
+    label: string;
+    timestamp: string;
+    load: number;
+    generation: number;
+    smp: number;
+    emissions: number;
+    v_mag_pu: number;
+    v_ang: number;
+  }>;
+  hasVoltageMagnitude: boolean;
+  hasVoltageAngle: boolean;
+  carrierMix: MixItem[];
+}
+
+export interface StorageUnitDetail {
+  name: string;
+  bus: string;
+  summary: SummaryItem[];
+  dispatchSeries: Array<{ label: string; timestamp: string; dispatch: number }>;
+  chargeSeries: Array<{ label: string; timestamp: string; charge: number }>;
+  dischargeSeries: Array<{ label: string; timestamp: string; discharge: number }>;
+  stateSeries: Array<{ label: string; timestamp: string; state: number }>;
+}
+
+export interface StoreDetail {
+  name: string;
+  bus: string;
+  summary: SummaryItem[];
+  energySeries: Array<{ label: string; timestamp: string; energy: number }>;
+  powerSeries: Array<{ label: string; timestamp: string; power: number }>;
+}
+
+export interface BranchDetail {
+  name: string;
+  component: string;
+  bus0: string;
+  bus1: string;
+  summary: SummaryItem[];
+  flowSeries: Array<{ label: string; timestamp: string; p0: number; p1: number }>;
+  loadingSeries: Array<{ label: string; timestamp: string; loading: number }>;
+  lossesSeries: Array<{ label: string; timestamp: string; losses: number }>;
+}
+
+export interface RunResults {
+  summary: SummaryItem[];
+  dispatchSeries: SeriesPoint[];
+  generatorDispatchSeries: SeriesPoint[];
+  systemPriceSeries: ValuePoint[];
+  systemEmissionsSeries: ValuePoint[];
+  storageSeries: StoragePoint[];
+  carrierMix: MixItem[];
+  nodalBalance: Array<{ label: string; load: number; generation: number }>;
+  lineLoading: Array<{ label: string; value: number }>;
+  narrative: string[];
+  runMeta: {
+    snapshotCount: number;
+    snapshotWeight: number;
+    modeledHours: number;
+    storeWeight: number;
+  };
+  assetDetails: {
+    generators: Record<string, GeneratorDetail>;
+    buses: Record<string, BusDetail>;
+    storageUnits: Record<string, StorageUnitDetail>;
+    stores: Record<string, StoreDetail>;
+    branches: Record<string, BranchDetail>;
+  };
+}
+
+export type AnalyticsFocus =
+  | { type: 'system' }
+  | { type: 'generator'; key: string }
+  | { type: 'bus'; key: string }
+  | { type: 'storageUnit'; key: string }
+  | { type: 'store'; key: string }
+  | { type: 'branch'; key: string };
+
+// ── Analytics / chart types ───────────────────────────────────────────────────
+
+export interface TimeSeriesSeries {
+  key: string;
+  label: string;
+  color: string;
+}
+
+export interface TimeSeriesRow {
+  label: string;
+  timestamp?: string;
+  [key: string]: string | number | undefined;
+}
+
+export interface MetricOption {
+  key: string;
+  label: string;
+  unit: string;
+  rows: TimeSeriesRow[];
+  series: TimeSeriesSeries[];
+  reducer: 'sum' | 'mean' | 'last';
+  allowDonut: boolean;
+}
+
+export interface ChartSectionConfig {
+  id: number;
+  metricKey: string;
+  chartType: ChartSectionType;
+  timeframe: TimeframeOption;
+  startIndex: number;
+  endIndex: number;
+  stacked: boolean;
+}
+
+// ── Tables pane ───────────────────────────────────────────────────────────────
+
+export type TableSelKind = 'static' | 'ts';
+export interface TableSel { kind: TableSelKind; sheet: AnySheetName }

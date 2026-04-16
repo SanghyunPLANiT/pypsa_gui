@@ -50,7 +50,7 @@ const ComponentMarkers: React.FC<ComponentMarkersProps> = ({
   };
 
   const renderConnections = () => {
-    const connections = [];
+    const connections: React.ReactElement[] = [];
 
     network.lines.forEach(line => {
       const pos0 = getBusPosition(line.bus0);
