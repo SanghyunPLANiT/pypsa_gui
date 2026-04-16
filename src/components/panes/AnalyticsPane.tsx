@@ -2,13 +2,14 @@ import React from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
-  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunResults, WorkbookModel,
+  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../types';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor } from '../../utils/helpers';
 import { FitToBounds } from '../map/FitToBounds';
 import { SummaryCards } from '../common/SummaryCards';
 import { UserDefinedChartCard } from '../charts/UserDefinedChartCard';
+import { ResultsDashboard } from '../charts/ResultsDashboard';
 
 interface Props {
   results: RunResults;
@@ -21,6 +22,11 @@ interface Props {
   chartSections: ChartSectionConfig[];
   setChartSections: React.Dispatch<React.SetStateAction<ChartSectionConfig[]>>;
   metricOptions: MetricOption[];
+  dispatchRows: TimeSeriesRow[];
+  dispatchSeries: TimeSeriesSeries[];
+  systemLoadRows: TimeSeriesRow[];
+  systemPriceRows: TimeSeriesRow[];
+  storageRows: TimeSeriesRow[];
 }
 
 function EmptyAnalytics() {
@@ -41,6 +47,8 @@ export function AnalyticsPane({
   analyticsFocus, setAnalyticsFocus,
   chartSections, setChartSections,
   metricOptions,
+  dispatchRows, dispatchSeries,
+  systemLoadRows, systemPriceRows, storageRows,
 }: Props) {
   const focusTitle =
     analyticsFocus.type === 'system' ? 'System analytics' : analyticsFocus.key;
@@ -93,6 +101,16 @@ export function AnalyticsPane({
           <span>{results.runMeta.snapshotWeight} h weight</span>
         </div>
       </div>
+
+      {/* Results dashboard */}
+      <ResultsDashboard
+        results={results}
+        dispatchRows={dispatchRows}
+        dispatchSeries={dispatchSeries}
+        systemLoadRows={systemLoadRows}
+        systemPriceRows={systemPriceRows}
+        storageRows={storageRows}
+      />
 
       {/* Map section */}
       <section className="chart-card analytics-map-card">

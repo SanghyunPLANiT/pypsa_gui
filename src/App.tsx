@@ -486,6 +486,11 @@ function App() {
                 chartSections={chartSections}
                 setChartSections={setChartSections}
                 metricOptions={metricOptions}
+                dispatchRows={systemDispatchRows}
+                dispatchSeries={systemDispatchSeries}
+                systemLoadRows={systemLoadRows}
+                systemPriceRows={systemPriceRows}
+                storageRows={storageRows}
               />
             )
           )}
