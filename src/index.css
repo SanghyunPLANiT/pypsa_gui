@@ -882,7 +882,6 @@ button {
 .chart-control-group,
 .chart-time-controls,
 .chart-legend,
-.legend-item-inline,
 .focus-chip,
 .modal-actions,
 .section-heading,
@@ -1062,6 +1061,7 @@ button {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0;
   align-self: flex-start;
   background: rgba(255,255,255,0.95);
