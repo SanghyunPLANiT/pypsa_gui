@@ -523,26 +523,33 @@ function App() {
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   {(() => {
-                    const step = Math.max(1, Math.round(snapshotWeight));
+                    const step = snapshotWeight;
                     const windowSize = snapshotEnd - snapshotStart;
                     const modeledSnapshots = Math.ceil(windowSize / step);
                     return (
-                      <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                        Time resolution — <strong>every {step}h</strong>
-                        {' '}({modeledSnapshots} snapshots of {windowSize} hourly steps · {windowSize}h window)
-                      </span>
+                      <>
+                        <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                          Time resolution — <strong>every {step}h</strong>
+                          {' '}({modeledSnapshots} snapshots of {windowSize} hourly steps)
+                        </span>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                          {[1, 2, 3, 4, 6, 8, 12, 24].map((n) => (
+                            <button
+                              key={n}
+                              className={`tb-btn${snapshotWeight === n ? '' : ' tb-btn--muted'}`}
+                              style={{ minWidth: 40 }}
+                              onClick={() => setSnapshotWeight(n)}
+                            >
+                              {n}h
+                            </button>
+                          ))}
+                        </div>
+                      </>
                     );
                   })()}
-                  <DualRangeSlider
-                    min={1} max={24}
-                    low={1} high={snapshotWeight}
-                    step={1}
-                    formatLabel={(v) => `${v}h`}
-                    onChange={(_lo, hi) => setSnapshotWeight(Math.max(1, Math.round(hi)))}
-                  />
                 </div>
                 <p className="status-text" style={{ marginBottom: 12 }}>
-                  Resolution selects every Nth hourly step — <code>snapshots[::N]</code> with{' '}
+                  Resolution selects every Nth step — <code>snapshots[::N]</code> with{' '}
                   <code>snapshot_weightings = N</code>. Higher N = coarser resolution, faster solve.
                 </p>
               </>

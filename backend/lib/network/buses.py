@@ -38,10 +38,16 @@ def parse_ts_sheet(
     model: dict[str, list[dict[str, Any]]],
     sheet_name: str,
     snapshots: pd.Index,
+    step: int = 1,
 ) -> dict[str, np.ndarray] | None:
     """Parse a time-series sheet (rows = timesteps, columns = component names).
     Returns a dict mapping component name → float array aligned to snapshots,
-    or None if the sheet is absent or empty."""
+    or None if the sheet is absent or empty.
+
+    When *step* > 1 the TS sheet is downsampled with ``arr[::step]`` before
+    alignment, matching the PyPSA convention of selecting every N-th snapshot.
+    If the raw row count equals ``len(snapshots)`` (sheet was already
+    pre-aggregated) the slice is skipped."""
     rows = model.get(sheet_name) or []
     if not rows:
         return None
@@ -51,10 +57,14 @@ def parse_ts_sheet(
     if not data_keys:
         return None
     result: dict[str, np.ndarray] = {}
+    n_snap = len(snapshots)
     for key in data_keys:
         vals = [number(r.get(key), 0.0) for r in rows]
         arr = np.array(vals, dtype=float)
-        if len(arr) == len(snapshots):
+        # Downsample when the raw array is longer than the (already-sliced) snapshot index.
+        if step > 1 and len(arr) != n_snap:
+            arr = arr[::step]
+        if len(arr) == n_snap:
             result[key] = arr
     return result if result else None
 
@@ -64,12 +74,13 @@ def add_loads(
     model: dict[str, list[dict[str, Any]]],
     snapshots: pd.Index,
     demand_growth_pct: float,
+    step: int = 1,
 ) -> dict[str, float]:
     """Add loads using workbook data only.
     If 'loads-p_set' sheet is present its time-series takes priority;
     otherwise the static p_set is used as a flat constant."""
     growth = 1.0 + demand_growth_pct / 100.0
-    ts_p_set = parse_ts_sheet(model, "loads-p_set", snapshots)
+    ts_p_set = parse_ts_sheet(model, "loads-p_set", snapshots, step=step)
     load_totals: dict[str, float] = defaultdict(float)
 
     for row in workbook_rows(model, "loads"):

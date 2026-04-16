@@ -25,15 +25,16 @@ def add_generators(
     renewable_multiplier: float,
     carbon_price: float,
     notes: list[str],
+    step: int = 1,
 ) -> None:
     generators = workbook_rows(model, "generators")
     if not generators:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Workbook has no generators.")
 
-    # Load time-series override sheets
-    ts_p_max_pu = parse_ts_sheet(model, "generators-p_max_pu", snapshots)
-    ts_p_min_pu = parse_ts_sheet(model, "generators-p_min_pu", snapshots)
+    # Load time-series override sheets — downsample by step to match snapshot index
+    ts_p_max_pu = parse_ts_sheet(model, "generators-p_max_pu", snapshots, step=step)
+    ts_p_min_pu = parse_ts_sheet(model, "generators-p_min_pu", snapshots, step=step)
 
     for row in generators:
         name = text(row.get("name"))

@@ -81,7 +81,7 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
 
     # Topology
     add_buses(network, model)
-    load_totals = add_loads(network, model, snapshots, number(scenario.get("demandGrowth"), 0.0))
+    load_totals = add_loads(network, model, snapshots, number(scenario.get("demandGrowth"), 0.0), step=step)
     add_stores(network, model, period_factor, notes)
     add_storage_units(network, model, period_factor, notes)
     add_shunt_impedances(network, model)
@@ -92,7 +92,7 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     # Formula: +1 % capacity per 1 % target (capped at 2× for targets above 100 %).
     renewable_multiplier = 1.0 + max(0.0, re_target) / 100.0
     carbon_price = number(scenario.get("carbonPrice"), 0.0)
-    add_generators(network, model, snapshots, period_factor, renewable_multiplier, carbon_price, notes)
+    add_generators(network, model, snapshots, period_factor, renewable_multiplier, carbon_price, notes, step=step)
     if re_target > 0:
         notes.append(
             f"RE target {re_target:.0f}%: scaled Solar/Wind/Hydro capacity by {renewable_multiplier:.2f}×; "
