@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pypsa
+
+
+def apply_custom_constraints(
+    n: pypsa.Network,
+    constraints: list[dict[str, Any]],
+    emissions_factors: dict[str, float],
+    notes: list[str],
+) -> None:
+    """Apply all enabled custom constraints to the linopy model.
+
+    Called inside extra_functionality, so n.model is available.
+    Silently skips any constraint that fails (logs a note instead).
+    """
+    if not constraints:
+        return
+
+    gen_p = n.model["Generator-p"]
+    # PyPSA/linopy uses 'name' as the generator dimension, not 'Generator'
+    dim = [d for d in gen_p.dims if d != "snapshot"][0]
+    weights = n.snapshot_weightings["generators"]
+
+    # Pre-build generator index sets used repeatedly
+    supply_gens = [
+        g for g in n.generators.index
+        if not g.startswith("load_shedding_") and g != "grid_imports"
+    ]
+    shed_gens = [g for g in n.generators.index if g.startswith("load_shedding_")]
+    re_carriers = {"Solar", "Wind", "Hydro"}
+    re_gens = n.generators.index[n.generators.carrier.isin(re_carriers)].tolist()
+
+    for i, c in enumerate(constraints):
+        if not c.get("enabled", False):
+            continue
+
+        metric: str = c.get("metric", "")
+        value: float = float(c.get("value", 0))
+        carrier: str = c.get("carrier", "")
+        label: str = c.get("label", metric)
+        cname = f"cc_{i}_{metric}"
+
+        try:
+            # ── CO₂ budget cap ───────────────────────────────────────────────
+            if metric == "co2_cap":
+                emitters = [
+                    (g, emissions_factors.get(n.generators.at[g, "carrier"], 0.0))
+                    for g in n.generators.index
+                ]
+                emitters = [(g, co2) for g, co2 in emitters if co2 > 0]
+                if not emitters:
+                    notes.append(f"Constraint '{label}': no CO₂-emitting generators found — skipped.")
+                    continue
+                lhs = sum(
+                    co2 * (gen_p.sel({dim: [g]}) * weights).sum()
+                    for g, co2 in emitters
+                )
+                n.model.add_constraints(lhs <= value * 1_000, name=cname)
+                notes.append(f"Constraint '{label}': CO₂ ≤ {value} ktCO₂e added.")
+
+            # ── Minimum renewable share ──────────────────────────────────────
+            elif metric == "re_share":
+                if not re_gens or not supply_gens:
+                    notes.append(f"Constraint '{label}': no renewable generators — skipped.")
+                    continue
+                re_total = (gen_p.sel({dim: re_gens}) * weights).sum()
+                all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
+                n.model.add_constraints(
+                    re_total >= (value / 100.0) * all_total, name=cname
+                )
+                notes.append(f"Constraint '{label}': RE share ≥ {value}% added.")
+
+            # ── Maximum load shedding ────────────────────────────────────────
+            elif metric == "max_load_shed":
+                if not shed_gens:
+                    notes.append(f"Constraint '{label}': no load-shedding generators — skipped.")
+                    continue
+                total_shed = (gen_p.sel({dim: shed_gens}) * weights).sum()
+                n.model.add_constraints(total_shed <= value, name=cname)
+                notes.append(f"Constraint '{label}': load shedding ≤ {value} MWh added.")
+
+            # ── Carrier generation cap / floor (GWh) ─────────────────────────
+            elif metric in ("carrier_max_gen", "carrier_min_gen"):
+                cgens = n.generators.index[n.generators.carrier == carrier].tolist()
+                if not cgens:
+                    notes.append(f"Constraint '{label}': no generators with carrier '{carrier}' — skipped.")
+                    continue
+                total = (gen_p.sel({dim: cgens}) * weights).sum()
+                if metric == "carrier_max_gen":
+                    n.model.add_constraints(total <= value * 1_000, name=cname)
+                    notes.append(f"Constraint '{label}': {carrier} generation ≤ {value} GWh added.")
+                else:
+                    n.model.add_constraints(total >= value * 1_000, name=cname)
+                    notes.append(f"Constraint '{label}': {carrier} generation ≥ {value} GWh added.")
+
+            # ── Carrier dispatch share cap / floor (%) ───────────────────────
+            elif metric in ("carrier_max_share", "carrier_min_share"):
+                cgens = n.generators.index[n.generators.carrier == carrier].tolist()
+                if not cgens or not supply_gens:
+                    notes.append(f"Constraint '{label}': carrier '{carrier}' or supply gens missing — skipped.")
+                    continue
+                carrier_total = (gen_p.sel({dim: cgens}) * weights).sum()
+                all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
+                frac = value / 100.0
+                if metric == "carrier_max_share":
+                    n.model.add_constraints(
+                        carrier_total - frac * all_total <= 0, name=cname
+                    )
+                    notes.append(f"Constraint '{label}': {carrier} share ≤ {value}% added.")
+                else:
+                    n.model.add_constraints(
+                        carrier_total - frac * all_total >= 0, name=cname
+                    )
+                    notes.append(f"Constraint '{label}': {carrier} share ≥ {value}% added.")
+
+            else:
+                notes.append(f"Constraint '{label}': unknown metric '{metric}' — skipped.")
+
+        except Exception as exc:
+            notes.append(f"Constraint '{label}' could not be added: {exc}")
