@@ -19,6 +19,7 @@ from .assets import (
     build_storage_unit_details,
     build_store_details,
 )
+from ..network.custom_constraints import apply_custom_constraints
 from .dispatch import (
     build_dispatch_series,
     build_price_emissions_series,
@@ -38,38 +39,38 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     )
 
     re_target = float(scenario.get("renewableTarget", 0.0))
+    custom_constraints: list[dict] = scenario.get("constraints") or []
 
     def extra_functionality(n, snapshots):
-        if re_target <= 0:
-            return
-        try:
-            re_carriers = {"Solar", "Wind", "Hydro"}
-            re_gens = n.generators.index[n.generators.carrier.isin(re_carriers)].tolist()
-            supply_gens = [
-                g for g in n.generators.index
-                if not g.startswith("load_shedding_") and g != "grid_imports"
-            ]
-            if not re_gens or not supply_gens:
-                notes.append(
-                    f"RE target {re_target:.0f}% requested but no renewable generators found — "
-                    "share constraint skipped."
-                )
-                return
-            weights = n.snapshot_weightings["generators"]
-            gen_p = n.model["Generator-p"]
-            # In PyPSA/linopy the dimension is called 'name', not 'Generator'
-            dim = [d for d in gen_p.dims if d != "snapshot"][0]
-            re_total = (gen_p.sel({dim: re_gens}) * weights).sum()
-            all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
-            target = re_target / 100.0
-            n.model.add_constraints(
-                re_total >= target * all_total, name="min_renewable_share"
-            )
-            notes.append(
-                f"Added min renewable share constraint: RE ≥ {re_target:.0f}% of total dispatch."
-            )
-        except Exception as exc:
-            notes.append(f"Could not add RE share constraint ({exc}) — continuing without it.")
+        # 1. Scenario-level RE target (params slider)
+        if re_target > 0:
+            try:
+                re_carriers = {"Solar", "Wind", "Hydro"}
+                re_gens = n.generators.index[n.generators.carrier.isin(re_carriers)].tolist()
+                supply_gens = [
+                    g for g in n.generators.index
+                    if not g.startswith("load_shedding_") and g != "grid_imports"
+                ]
+                if not re_gens or not supply_gens:
+                    notes.append(
+                        f"RE target {re_target:.0f}% requested but no renewable generators found — "
+                        "share constraint skipped."
+                    )
+                else:
+                    weights = n.snapshot_weightings["generators"]
+                    gen_p = n.model["Generator-p"]
+                    dim = [d for d in gen_p.dims if d != "snapshot"][0]
+                    re_total = (gen_p.sel({dim: re_gens}) * weights).sum()
+                    all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
+                    n.model.add_constraints(
+                        re_total >= (re_target / 100.0) * all_total, name="scenario_re_target"
+                    )
+                    notes.append(f"Scenario RE target: RE ≥ {re_target:.0f}% of total dispatch.")
+            except Exception as exc:
+                notes.append(f"Could not add RE target constraint: {exc}")
+
+        # 2. Custom constraints panel
+        apply_custom_constraints(n, custom_constraints, emissions_factors, notes)
 
     try:
         network.optimize(solver_name="highs", extra_functionality=extra_functionality)

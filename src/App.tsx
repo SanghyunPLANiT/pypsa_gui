@@ -43,7 +43,20 @@ type TsSheetName = (typeof TS_SHEETS)[number];
 type AnySheetName = SheetName | TsSheetName;
 type Primitive = string | number | boolean | null;
 type GridRow = Record<string, Primitive>;
-type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Scenarios' | 'Analytics';
+type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Analytics';
+type ConstraintMetric =
+  | 'co2_cap' | 're_share' | 'max_load_shed'
+  | 'carrier_max_gen' | 'carrier_min_gen'
+  | 'carrier_max_share' | 'carrier_min_share';
+interface CustomConstraint {
+  id: string;
+  enabled: boolean;
+  label: string;
+  metric: ConstraintMetric;
+  carrier: string;
+  value: number;
+  unit: string;
+}
 type BrowserFileHandle = any;
 type ChartMode = 'line' | 'area' | 'bar';
 type ChartSectionType = ChartMode | 'donut';
@@ -407,6 +420,27 @@ const CARRIER_COLORS: Record<string, string> = {
   battery: '#0ea5e9', Imports: '#dc2626', LoadShedding: '#991b1b',
   load: '#94a3b8', HVDC: '#6366f1', Other: '#94a3b8',
 };
+
+const METRIC_DEFS: Record<ConstraintMetric, { label: string; description: string; unit: string; needsCarrier: boolean; sense: string }> = {
+  co2_cap:          { label: 'CO₂ Budget Cap',         description: 'Total system CO₂ ≤ value',                       unit: 'ktCO₂e', needsCarrier: false, sense: '≤' },
+  re_share:         { label: 'Min Renewable Share',    description: 'Solar+Wind+Hydro share ≥ value',                 unit: '%',      needsCarrier: false, sense: '≥' },
+  max_load_shed:    { label: 'Max Load Shedding',      description: 'Total unserved energy ≤ value',                  unit: 'MWh',    needsCarrier: false, sense: '≤' },
+  carrier_max_gen:  { label: 'Max Carrier Generation', description: 'Total output of carrier ≤ value',                unit: 'GWh',    needsCarrier: true,  sense: '≤' },
+  carrier_min_gen:  { label: 'Min Carrier Generation', description: 'Total output of carrier ≥ value',                unit: 'GWh',    needsCarrier: true,  sense: '≥' },
+  carrier_max_share:{ label: 'Max Carrier Share',      description: 'Carrier dispatch / total dispatch ≤ value',      unit: '%',      needsCarrier: true,  sense: '≤' },
+  carrier_min_share:{ label: 'Min Carrier Share',      description: 'Carrier dispatch / total dispatch ≥ value',      unit: '%',      needsCarrier: true,  sense: '≥' },
+};
+
+const DEFAULT_CONSTRAINTS: CustomConstraint[] = [
+  { id: 'p_co2',      enabled: false, label: 'CO₂ Budget Cap',         metric: 'co2_cap',          carrier: '',       value: 50,  unit: 'ktCO₂e' },
+  { id: 'p_re',       enabled: false, label: 'Min Renewable Share',    metric: 're_share',          carrier: '',       value: 30,  unit: '%' },
+  { id: 'p_shed',     enabled: false, label: 'Max Load Shedding',      metric: 'max_load_shed',     carrier: '',       value: 100, unit: 'MWh' },
+  { id: 'p_coal_sh',  enabled: false, label: 'Max Coal Share',         metric: 'carrier_max_share', carrier: 'Coal',   value: 30,  unit: '%' },
+  { id: 'p_lng_sh',   enabled: false, label: 'Max LNG Share',          metric: 'carrier_max_share', carrier: 'LNG',    value: 50,  unit: '%' },
+  { id: 'p_nuc_min',  enabled: false, label: 'Min Nuclear Output',     metric: 'carrier_min_gen',   carrier: 'Nuclear',value: 10,  unit: 'GWh' },
+  { id: 'p_solar_min',enabled: false, label: 'Min Solar Output',       metric: 'carrier_min_gen',   carrier: 'Solar',  value: 0,   unit: 'GWh' },
+  { id: 'p_coal_max', enabled: false, label: 'Max Coal Generation',    metric: 'carrier_max_gen',   carrier: 'Coal',   value: 100, unit: 'GWh' },
+];
 
 const DEFAULT_SCENARIO: ScenarioSettings = {
   caseName: 'Base Network',
@@ -2157,12 +2191,177 @@ function snapshotMaxFromWorkbook(rows: GridRow[]): number {
   return rows.length;
 }
 
+/* ── Sidebar collapsible group ─────────────────────────────────────────── */
+function SidebarGroup({
+  title, icon, defaultOpen = false, badge, children,
+}: {
+  title: string; icon?: string; defaultOpen?: boolean; badge?: React.ReactNode; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="sg">
+      <button className="sg-header" onClick={() => setOpen((o) => !o)}>
+        {icon && <span className="sg-icon">{icon}</span>}
+        <span className="sg-title">{title}</span>
+        {badge}
+        <span className={`sg-chevron${open ? ' is-open' : ''}`}>▾</span>
+      </button>
+      {open && <div className="sg-body">{children}</div>}
+    </div>
+  );
+}
+
+/* ── Global constraints panel ──────────────────────────────────────────── */
+function GlobalConstraintsSection({
+  constraints, carriers, onChange,
+}: {
+  constraints: CustomConstraint[];
+  carriers: string[];
+  onChange: (next: CustomConstraint[]) => void;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [newMetric, setNewMetric] = useState<ConstraintMetric>('co2_cap');
+  const [newCarrier, setNewCarrier] = useState('');
+  const [newValue, setNewValue] = useState(0);
+  const [newLabel, setNewLabel] = useState('');
+
+  const update = (id: string, patch: Partial<CustomConstraint>) =>
+    onChange(constraints.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+
+  const presets = constraints.filter((c) => c.id.startsWith('p_'));
+  const customs = constraints.filter((c) => !c.id.startsWith('p_'));
+  const activeCount = constraints.filter((c) => c.enabled).length;
+  const def = METRIC_DEFS[newMetric];
+
+  const handleAdd = () => {
+    if (!newLabel.trim() && !def) return;
+    const nc: CustomConstraint = {
+      id: `cc_${Date.now()}`,
+      enabled: true,
+      label: newLabel.trim() || def.label,
+      metric: newMetric,
+      carrier: def.needsCarrier ? newCarrier : '',
+      value: newValue,
+      unit: def.unit,
+    };
+    onChange([...constraints, nc]);
+    setAddOpen(false);
+    setNewLabel('');
+    setNewValue(0);
+  };
+
+  return (
+    <div className="gcc">
+      {activeCount > 0 && (
+        <div className="gcc-active-row">
+          <span className="gcc-active-dot" />
+          <span className="gcc-active-label">{activeCount} active</span>
+        </div>
+      )}
+
+      {/* Presets */}
+      <div className="gcc-section-label">Presets</div>
+      {presets.map((c) => {
+        const d = METRIC_DEFS[c.metric];
+        return (
+          <div key={c.id} className={`gcc-row${c.enabled ? ' gcc-row--on' : ''}`}>
+            <input
+              className="gcc-check" type="checkbox" checked={c.enabled}
+              onChange={(e) => update(c.id, { enabled: e.target.checked })}
+            />
+            <span className="gcc-sense" title={d?.description}>{d?.sense}</span>
+            <span className="gcc-label" title={d?.description}>{c.label}</span>
+            {d?.needsCarrier && (
+              <select className="gcc-carrier" value={c.carrier}
+                onChange={(e) => update(c.id, { carrier: e.target.value })}>
+                {carriers.map((ca) => <option key={ca}>{ca}</option>)}
+              </select>
+            )}
+            <input className="gcc-val" type="number" value={c.value}
+              onChange={(e) => update(c.id, { value: parseFloat(e.target.value) || 0 })} />
+            <span className="gcc-unit">{c.unit}</span>
+          </div>
+        );
+      })}
+
+      {/* Custom constraints */}
+      {customs.length > 0 && (
+        <>
+          <div className="gcc-section-label" style={{ marginTop: 6 }}>Custom</div>
+          {customs.map((c) => {
+            const d = METRIC_DEFS[c.metric];
+            return (
+              <div key={c.id} className={`gcc-row${c.enabled ? ' gcc-row--on' : ''}`}>
+                <input
+                  className="gcc-check" type="checkbox" checked={c.enabled}
+                  onChange={(e) => update(c.id, { enabled: e.target.checked })}
+                />
+                <span className="gcc-sense">{d?.sense}</span>
+                <input className="gcc-label-input" value={c.label}
+                  onChange={(e) => update(c.id, { label: e.target.value })} />
+                {d?.needsCarrier && (
+                  <select className="gcc-carrier" value={c.carrier}
+                    onChange={(e) => update(c.id, { carrier: e.target.value })}>
+                    {carriers.map((ca) => <option key={ca}>{ca}</option>)}
+                  </select>
+                )}
+                <input className="gcc-val" type="number" value={c.value}
+                  onChange={(e) => update(c.id, { value: parseFloat(e.target.value) || 0 })} />
+                <span className="gcc-unit">{c.unit}</span>
+                <button className="gcc-del" onClick={() => onChange(constraints.filter((x) => x.id !== c.id))}>✕</button>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* Add form */}
+      {!addOpen ? (
+        <button className="gcc-add-btn" onClick={() => setAddOpen(true)}>+ Add constraint</button>
+      ) : (
+        <div className="gcc-add-form">
+          <div className="gcc-add-row">
+            <select className="gcc-add-metric" value={newMetric}
+              onChange={(e) => { setNewMetric(e.target.value as ConstraintMetric); setNewCarrier(''); }}>
+              {(Object.keys(METRIC_DEFS) as ConstraintMetric[]).map((m) => (
+                <option key={m} value={m}>{METRIC_DEFS[m].label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="gcc-add-row">
+            {def.needsCarrier && (
+              <select className="gcc-carrier" value={newCarrier}
+                onChange={(e) => setNewCarrier(e.target.value)}>
+                <option value="">— carrier —</option>
+                {carriers.map((ca) => <option key={ca}>{ca}</option>)}
+              </select>
+            )}
+            <input className="gcc-val" type="number" value={newValue}
+              onChange={(e) => setNewValue(parseFloat(e.target.value) || 0)} />
+            <span className="gcc-unit">{def.unit}</span>
+          </div>
+          <div className="gcc-add-row">
+            <input className="gcc-label-input" placeholder={`Label (optional)`} value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)} />
+          </div>
+          <div className="gcc-add-row">
+            <button className="tb-btn" onClick={handleAdd}>Add</button>
+            <button className="tb-btn tb-btn--muted" onClick={() => setAddOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
   const [tab, setTab] = useState<WorkspaceTab>('Map');
   const [scenarios, setScenarios] = useState<SavedScenario[]>([_INIT_SCENARIO]);
   const [activeId, setActiveId] = useState<string>(_INIT_SCENARIO.id);
   const [maxSnapshots, setMaxSnapshots] = useState<number>(1);
+  const [constraints, setConstraints] = useState<CustomConstraint[]>(DEFAULT_CONSTRAINTS);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Derived from active scenario
   const activeScenario = scenarios.find((s) => s.id === activeId) ?? scenarios[0];
@@ -2381,7 +2580,7 @@ function App() {
     const snapshotCount = sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart;
     const runOptions = {
       model,
-      scenario: sc.params,
+      scenario: { ...sc.params, constraints: constraints.filter((c) => c.enabled) },
       options: {
         snapshotCount,
         snapshotStart: sc.runSettings.snapshotStart,
@@ -2627,51 +2826,116 @@ function App() {
     <div className="studio-shell">
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleImport} />
 
-      <main className="workspace">
-        <header className="topbar">
-          <div className="topbar-left">
-            <span className="topbar-brand">PyPSA Studio</span>
-            <div className="topbar-divider" />
-            <button className="run-button" onClick={() => setRunDialogOpen(true)}>Run</button>
-            <div className="topbar-file-ops">
-              <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
-              <button className="tb-btn" onClick={saveWorkbook}>Save</button>
-              <button className="tb-btn" onClick={saveAsWorkbook}>Save As</button>
-              <button className="tb-btn tb-btn--muted" onClick={() => {
-                loadSampleWorkbook()
-                  .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
-                  .catch(() => setStatus('Could not reload sample model.'));
-              }}>Demo</button>
-            </div>
+      {/* ── Row 1: Top bar ─────────────────────────────────────── */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <span className="topbar-brand">PyPSA Studio</span>
+          <div className="topbar-divider" />
+          <button className="run-button" onClick={() => setRunDialogOpen(true)}>▶ Run</button>
+          <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
+          <div className="topbar-divider" />
+          <div className="case-chip">
+            <span>Workbook</span>
+            <strong>{filename}</strong>
+          </div>
+          {results && (
             <div className="case-chip">
-              <span>Workbook</span>
-              <strong>{filename}</strong>
-            </div>
-            <div className="case-chip" style={{ cursor: 'pointer' }} onClick={() => setTab('Scenarios')}>
-              <span>Active scenario</span>
-              <strong>{activeScenario.name}</strong>
+              <span>Last run</span>
+              <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h</strong>
               <ScenarioStatusBadge status={activeScenario.status} />
             </div>
-            <span className="topbar-status" title={status}>{status}</span>
-          </div>
-          <nav className="tab-nav">
-            {(['Map', 'Tables', 'Validation', 'Scenarios', 'Analytics'] as WorkspaceTab[]).map((item) => (
-              <button
-                key={item}
-                className={`tab-button ${tab === item ? 'is-active' : ''} ${item === 'Validation' && validateResult && !validateResult.valid ? 'tab-button--error' : ''} ${item === 'Validation' && validateResult && validateResult.valid ? 'tab-button--ok' : ''}`}
-                onClick={() => setTab(item)}
-              >
-                {item}
-                {item === 'Validation' && validateResult && (
-                  <span className="tab-badge">{validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </header>
+          )}
+          <span className="topbar-status" title={status}>{status}</span>
+        </div>
+        <nav className="tab-nav">
+          {(['Map', 'Tables', 'Validation', 'Analytics'] as WorkspaceTab[]).map((item) => (
+            <button
+              key={item}
+              className={`tab-button ${tab === item ? 'is-active' : ''} ${item === 'Validation' && validateResult && !validateResult.valid ? 'tab-button--error' : ''} ${item === 'Validation' && validateResult && validateResult.valid ? 'tab-button--ok' : ''}`}
+              onClick={() => setTab(item)}
+            >
+              {item}
+              {item === 'Validation' && validateResult && (
+                <span className="tab-badge">{validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+      </header>
 
-        <section className="workspace-body">
-          <div className="workspace-main">
+      {/* ── Row 2: Sidebar + Main ───────────────────────────────── */}
+      <div className="workspace-body">
+        {/* Left sidebar */}
+        <aside className={`app-sidebar${sidebarOpen ? '' : ' app-sidebar--collapsed'}`}>
+          <button className="sidebar-toggle" onClick={() => setSidebarOpen((o) => !o)} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+            {sidebarOpen ? '◂' : '▸'}
+          </button>
+          {sidebarOpen && (
+            <>
+              <SidebarGroup title="File" icon="📁" defaultOpen>
+                <div className="sg-btn-grid">
+                  <button className="tb-btn sg-full" onClick={handleOpenWorkbook}>Open</button>
+                  <button className="tb-btn sg-full" onClick={saveWorkbook}>Save</button>
+                  <button className="tb-btn sg-full" onClick={saveAsWorkbook}>Save As</button>
+                  <button className="tb-btn tb-btn--muted sg-full" onClick={() => {
+                    loadSampleWorkbook()
+                      .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
+                      .catch(() => setStatus('Could not reload sample model.'));
+                  }}>Demo</button>
+                </div>
+              </SidebarGroup>
+
+              <SidebarGroup title="Model" icon="⚙" defaultOpen>
+                <div className="sg-params">
+                  {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step, tooltip }) => (
+                    <div key={key} className="sg-param-row" title={tooltip}>
+                      <div className="sg-param-label">
+                        <span>{label}</span>
+                        <span className="sg-param-val">{scenario[key]}{unit}</span>
+                      </div>
+                      <input
+                        type="range" className="sg-slider"
+                        min={min} max={max} step={step}
+                        value={Number(scenario[key])}
+                        onChange={(e) => handleUpdateScenarioParam(activeId, key, parseFloat(e.target.value))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </SidebarGroup>
+
+              <SidebarGroup
+                title="Constraints" icon="⛓"
+                badge={constraints.filter((c) => c.enabled).length > 0
+                  ? <span className="sg-badge">{constraints.filter((c) => c.enabled).length}</span>
+                  : undefined}
+              >
+                <GlobalConstraintsSection
+                  constraints={constraints}
+                  carriers={Array.from(new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)))}
+                  onChange={setConstraints}
+                />
+              </SidebarGroup>
+
+              {results && (
+                <SidebarGroup title="Results" icon="📊" defaultOpen>
+                  <div className="sg-summary">
+                    {results.summary.map((s) => (
+                      <div key={s.label} className="sg-summary-item">
+                        <span className="sg-summary-label">{s.label}</span>
+                        <span className="sg-summary-value">{s.value}</span>
+                        <span className="sg-summary-detail">{s.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                </SidebarGroup>
+              )}
+            </>
+          )}
+        </aside>
+
+        {/* Main content */}
+        <div className="workspace-main">
             {tab === 'Map' && (
               <div className="pane">
                 <div className="pane-header">
@@ -2824,23 +3088,6 @@ function App() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
-
-            {tab === 'Scenarios' && (
-              <div className="pane scenarios-pane-wrap">
-                <ScenariosPane
-                  scenarios={scenarios}
-                  activeId={activeId}
-                  maxSnapshots={maxSnapshots}
-                  onSetActive={setActiveId}
-                  onClone={handleCloneScenario}
-                  onDelete={handleDeleteScenario}
-                  onRun={(id) => handleRunModel(id)}
-                  onRename={handleRenameScenario}
-                  onUpdateParam={handleUpdateScenarioParam}
-                  onUpdateRunSettings={handleUpdateScenarioRunSettings}
-                />
               </div>
             )}
 
@@ -3106,9 +3353,8 @@ function App() {
                 )}
               </div>
             )}
-          </div>
-        </section>
-      </main>
+        </div>
+      </div>
 
       {runDialogOpen && (
         <div className="modal-backdrop" onClick={() => setRunDialogOpen(false)}>
