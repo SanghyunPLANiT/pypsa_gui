@@ -71,6 +71,7 @@ export function DonutChart({ data }: { data: MixItem[] }) {
         })()}
       </svg>
       <div className="legend-list">
+        <div className="map-legend-title" style={{ marginBottom: 4 }}>Breakdown</div>
         {data.map((item) => (
           <div key={item.label} className="legend-item">
             <span className="legend-swatch" style={{ backgroundColor: item.color }} />
