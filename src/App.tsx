@@ -2011,7 +2011,6 @@ function App() {
                         center={[numberValue(bus.y), numberValue(bus.x)]}
                         radius={8}
                         pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 0.95 }}
-                        eventHandlers={{ click: () => setTab('Tables') }}
                       >
                         <Tooltip sticky>
                           <strong>{stringValue(bus.name)}</strong>
@@ -2029,7 +2028,6 @@ function App() {
                           center={[numberValue(bus.y) + 0.07, numberValue(bus.x) + 0.07]}
                           radius={5}
                           pathOptions={{ color: '#ffffff', weight: 1.5, fillColor: carrierColor(stringValue(generator.carrier)), fillOpacity: 0.95 }}
-                          eventHandlers={{ click: () => setTab('Tables') }}
                         >
                           <Tooltip>{stringValue(generator.name)} · {stringValue(generator.carrier)} · {Math.round(numberValue(generator.p_nom))} MW</Tooltip>
                         </CircleMarker>
