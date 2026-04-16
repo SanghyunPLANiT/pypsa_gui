@@ -77,9 +77,17 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     add_shunt_impedances(network, model)
 
     # Generation
-    renewable_multiplier = 1.0 + number(scenario.get("renewableTarget"), 0.0) / 1000.0
+    re_target = number(scenario.get("renewableTarget"), 0.0)
+    # Scale up renewable capacity so the model can physically achieve the target.
+    # Formula: +1 % capacity per 1 % target (capped at 2× for targets above 100 %).
+    renewable_multiplier = 1.0 + max(0.0, re_target) / 100.0
     carbon_price = number(scenario.get("carbonPrice"), 0.0)
     add_generators(network, model, snapshots, period_factor, renewable_multiplier, carbon_price, notes)
+    if re_target > 0:
+        notes.append(
+            f"RE target {re_target:.0f}%: scaled Solar/Wind/Hydro capacity by {renewable_multiplier:.2f}×; "
+            f"minimum renewable share constraint will be added at solve time."
+        )
     add_grid_imports_and_shedding(
         network, load_totals, carbon_price, number(scenario.get("storageExpansion"), 0.0), notes
     )
