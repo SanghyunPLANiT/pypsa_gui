@@ -128,6 +128,8 @@ function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: Spreadsheet
   const [colFilters, setColFilters] = useState<Record<string, Set<string>>>({});
   const [openCol, setOpenCol] = useState<string | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  // Refs to <th> elements so we can read getBoundingClientRect() on click
+  const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
 
   // Reset filters whenever the sheet changes (cols change)
   useEffect(() => {
@@ -163,9 +165,10 @@ function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: Spreadsheet
     }),
   );
 
-  const openDropdown = (col: string, thEl: HTMLElement) => {
+  const openDropdown = (col: string) => {
     if (openCol === col) { setOpenCol(null); return; }
-    setAnchorRect(thEl.getBoundingClientRect());
+    const thEl = thRefs.current[col];
+    if (thEl) setAnchorRect(thEl.getBoundingClientRect());
     setOpenCol(col);
   };
 
@@ -208,15 +211,20 @@ function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: Spreadsheet
             {cols.map((c) => {
               const active = isActive(c);
               return (
-                <th key={c} title={c} className={active ? 'col-filtered' : undefined}>
+                <th
+                  key={c}
+                  title={c}
+                  className={active ? 'col-filtered' : undefined}
+                  ref={(el) => { thRefs.current[c] = el; }}
+                >
                   <div className="col-header-inner">
                     <span className="col-header-label">{c}</span>
                     <button
                       className={`col-filter-btn${active ? ' col-filter-btn--active' : ''}`}
                       title={active ? 'Filter active' : 'Filter'}
-                      onMouseDown={(e) => {
-                        e.preventDefault(); // prevent losing focus from cell editor
-                        openDropdown(c, e.currentTarget.closest('th') as HTMLElement);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDropdown(c);
                       }}
                     >
                       ▾
