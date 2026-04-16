@@ -2205,7 +2205,6 @@ function App() {
             <button className="run-button" onClick={() => setRunDialogOpen(true)}>Run</button>
             <div className="topbar-file-ops">
               <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
-              <button className="tb-btn" onClick={() => fileInputRef.current?.click()}>Import</button>
               <button className="tb-btn" onClick={saveWorkbook}>Save</button>
               <button className="tb-btn" onClick={saveAsWorkbook}>Save As</button>
               <button className="tb-btn tb-btn--muted" onClick={() => {
