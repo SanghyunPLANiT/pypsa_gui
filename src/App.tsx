@@ -87,35 +87,6 @@ interface WorkbookModel {
 }
 
 
-interface ScenarioSettings {
-  caseName: string;
-  planningYear: number;
-  demandGrowth: number;
-  renewableTarget: number;
-  storageExpansion: number;
-  transmissionExpansion: number;
-  carbonPrice: number;
-  reserveMargin: number;
-  priceSensitivity: number;
-}
-
-interface RunSettings {
-  snapshotStart: number;
-  snapshotEnd: number;
-  snapshotWeight: number;
-}
-
-interface SavedScenario {
-  id: string;
-  name: string;
-  params: ScenarioSettings;
-  runSettings: RunSettings;
-  status: 'idle' | 'running' | 'done' | 'error';
-  results: RunResults | null;
-  createdAt: number;
-  ranAt: number | null;
-  errorMsg: string | null;
-}
 
 interface SummaryItem {
   label: string;
@@ -410,9 +381,6 @@ const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
   },
 };
 
-// Distinct colors for up to 7 scenarios in comparison charts
-const SCENARIO_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777'];
-
 // Carrier colors (sourced from public/sample_model.xlsx carriers sheet)
 const CARRIER_COLORS: Record<string, string> = {
   AC: '#475569', LNG: '#1f4e79', Coal: '#374151', Nuclear: '#7c3aed',
@@ -442,23 +410,15 @@ const DEFAULT_CONSTRAINTS: CustomConstraint[] = [
   { id: 'p_coal_max', enabled: false, label: 'Max Coal Generation',    metric: 'carrier_max_gen',   carrier: 'Coal',   value: 100, unit: 'GWh' },
 ];
 
-const DEFAULT_SCENARIO: ScenarioSettings = {
-  caseName: 'Base Network',
-  planningYear: 2026,
-  demandGrowth: 3.2,
-  renewableTarget: 42,
-  storageExpansion: 900,
-  transmissionExpansion: 8,
-  carbonPrice: 42,
-  reserveMargin: 18,
-  priceSensitivity: 0.65,
-};
 
-const DEFAULT_RUN_SETTINGS: RunSettings = {
-  snapshotStart: 0,
-  snapshotEnd: 24,
-  snapshotWeight: 1,
-};
+function snapshotMaxFromWorkbook(rows: GridRow[]): number {
+  if (!rows || rows.length === 0) return 1;
+  for (const row of rows) {
+    const label = String(row.snapshot ?? row.name ?? row.datetime ?? '').trim().toLowerCase();
+    if (label === 'now' || label === '') return 1;
+  }
+  return rows.length;
+}
 
 function createEmptyWorkbook(): WorkbookModel {
   const base = Object.fromEntries(SHEETS.map((s) => [s, []]));
@@ -1548,648 +1508,6 @@ function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps)
   );
 }
 
-// ── Scenario Comparison View ─────────────────────────────────────────────────
-
-type CompareSub = 'kpis' | 'ts' | 'mix';
-type TsMetric = 'price' | 'emissions' | 'dispatch' | 'storage';
-
-function parseKpiNum(val: string): number {
-  const m = val.replace(/,/g, '').match(/-?[\d.]+/);
-  return m ? parseFloat(m[0]) : 0;
-}
-
-function MiniBarChart({
-  title,
-  unit,
-  bars,
-  baselineId,
-}: {
-  title: string;
-  unit: string;
-  bars: Array<{ id: string; label: string; value: number; color: string }>;
-  baselineId: string;
-}) {
-  const [hov, setHov] = useState<number | null>(null);
-  const W = 260, H = 160, PL = 8, PR = 8, PT = 28, PB = 32;
-  const iW = W - PL - PR;
-  const iH = H - PT - PB;
-  const maxV = Math.max(...bars.map((b) => Math.abs(b.value)), 1);
-  const bw = Math.max(4, iW / Math.max(bars.length, 1) - 8);
-  const baselineVal = bars.find((b) => b.id === baselineId)?.value ?? null;
-  return (
-    <div className="sc-mini-chart">
-      <p className="sc-mini-title">{title}</p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="sc-mini-svg"
-        onMouseLeave={() => setHov(null)}>
-        {[0, 0.5, 1].map((t) => (
-          <line key={t} x1={PL} x2={W - PR}
-            y1={PT + iH - t * iH} y2={PT + iH - t * iH}
-            stroke="rgba(15,23,42,0.07)" strokeWidth={1} />
-        ))}
-        {bars.map((b, i) => {
-          const bh = (Math.abs(b.value) / maxV) * iH;
-          const cx = PL + i * (iW / bars.length) + (iW / bars.length - bw) / 2;
-          const isHov = hov === i;
-          return (
-            <g key={b.id}
-              onMouseEnter={() => setHov(i)}
-              onMouseLeave={() => setHov(null)}
-              style={{ cursor: 'default' }}>
-              <rect x={cx} y={PT + iH - bh} width={bw} height={bh}
-                fill={b.color} fillOpacity={isHov ? 1 : 0.8} rx={3} />
-              <text x={cx + bw / 2} y={H - 4} textAnchor="middle"
-                fontSize={9} fill="#64748b" fontFamily="IBM Plex Sans, sans-serif">
-                {b.label.length > 8 ? b.label.slice(0, 7) + '…' : b.label}
-              </text>
-              {isHov && (
-                <g style={{ pointerEvents: 'none' }}>
-                  <rect x={Math.min(cx + bw + 4, W - 120)} y={PT}
-                    width={110} height={baselineVal !== null ? 48 : 32}
-                    rx={6} fill="rgba(15,23,42,0.88)" />
-                  <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 14}
-                    fill="white" fontSize={11} fontWeight={700} fontFamily="IBM Plex Sans, sans-serif">
-                    {b.value.toLocaleString(undefined, { maximumFractionDigits: 1 })} {unit}
-                  </text>
-                  {baselineVal !== null && b.id !== baselineId && (
-                    <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 30}
-                      fill={b.value > baselineVal ? '#f87171' : '#4ade80'}
-                      fontSize={10} fontFamily="IBM Plex Sans, sans-serif">
-                      {b.value > baselineVal ? '+' : ''}
-                      {(((b.value - baselineVal) / (Math.abs(baselineVal) || 1)) * 100).toFixed(1)}% vs baseline
-                    </text>
-                  )}
-                  {b.id === baselineId && (
-                    <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 30}
-                      fill="#94a3b8" fontSize={10} fontFamily="IBM Plex Sans, sans-serif">baseline</text>
-                  )}
-                </g>
-              )}
-            </g>
-          );
-        })}
-        <text x={W / 2} y={PT - 6} textAnchor="middle"
-          fontSize={10} fill="#94a3b8" fontFamily="IBM Plex Sans, sans-serif">{unit}</text>
-      </svg>
-    </div>
-  );
-}
-
-function TsCompareChart({
-  metric,
-  scenarios,
-}: {
-  metric: TsMetric;
-  scenarios: Array<SavedScenario & { color: string }>;
-}) {
-  const [hov, setHov] = useState<number | null>(null);
-  const W = 820, H = 320, P = 40;
-  const iW = W - P * 2, iH = H - P * 2;
-
-  const seriesData = scenarios.map((sc) => {
-    const r = sc.results!;
-    if (metric === 'price') return r.systemPriceSeries.map((p) => ({ t: p.timestamp, v: p.value }));
-    if (metric === 'emissions') return r.systemEmissionsSeries.map((p) => ({ t: p.timestamp, v: p.value }));
-    if (metric === 'dispatch') return r.dispatchSeries.map((p) => ({ t: p.timestamp, v: p.total ?? 0 }));
-    if (metric === 'storage') return r.storageSeries.map((p) => ({ t: p.timestamp, v: p.state }));
-    return [];
-  });
-
-  const maxLen = Math.max(...seriesData.map((d) => d.length), 1);
-  const allVals = seriesData.flatMap((d) => d.map((p) => p.v));
-  const maxV = Math.max(...allVals, 1);
-  const minV = Math.min(...allVals, 0);
-  const range = Math.max(maxV - minV, 1);
-
-  const xFor = (idx: number, len: number) => P + (idx / Math.max(len - 1, 1)) * iW;
-  const yFor = (v: number) => P + iH - ((v - minV) / range) * iH;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart-svg"
-      style={{ width: '100%' }}
-      onMouseLeave={() => setHov(null)}
-      onMouseMove={(e) => {
-        const svgEl = e.currentTarget as SVGSVGElement;
-        const pt = svgEl.createSVGPoint();
-        pt.x = e.clientX; pt.y = e.clientY;
-        const sp = pt.matrixTransform(svgEl.getScreenCTM()!.inverse());
-        const idx = Math.round(((sp.x - P) / iW) * (maxLen - 1));
-        setHov(Math.max(0, Math.min(maxLen - 1, idx)));
-      }}>
-      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-        <g key={t}>
-          <line x1={P} x2={W - P} y1={P + iH - t * iH} y2={P + iH - t * iH} className="chart-grid" />
-          <text x={6} y={P + iH - t * iH + 4} className="chart-axis">
-            {Math.round(minV + range * t)}
-          </text>
-        </g>
-      ))}
-      {seriesData.map((pts, si) => {
-        if (!pts.length) return null;
-        const sc = scenarios[si];
-        const d = pts.map((p, i) =>
-          `${i === 0 ? 'M' : 'L'} ${xFor(i, pts.length)} ${yFor(p.v)}`
-        ).join(' ');
-        return <path key={sc.id} d={d} fill="none" stroke={sc.color} strokeWidth={2.5} strokeLinecap="round" />;
-      })}
-      {[0, Math.floor(maxLen / 4), Math.floor(maxLen / 2), Math.floor(3 * maxLen / 4), maxLen - 1]
-        .filter((i, idx, arr) => arr.indexOf(i) === idx && i < maxLen)
-        .map((i) => {
-          const t = seriesData[0]?.[i]?.t;
-          return (
-            <text key={i} x={xFor(i, maxLen)} y={H - 4} textAnchor="middle" className="chart-axis chart-axis-x">
-              {t ? (t.length > 10 ? t.slice(5, 13) : t) : i}
-            </text>
-          );
-        })}
-      {hov !== null && (() => {
-        const hx = xFor(hov, maxLen);
-        const items = scenarios.map((sc, si) => {
-          const v = seriesData[si]?.[Math.min(hov, seriesData[si].length - 1)]?.v ?? 0;
-          return { label: sc.name, color: sc.color, value: v };
-        });
-        const tipH = 20 + items.length * 18;
-        const tx = hx + 12 + 180 > W - P ? hx - 192 : hx + 12;
-        return (
-          <g style={{ pointerEvents: 'none' }}>
-            <line x1={hx} x2={hx} y1={P} y2={H - P} stroke="rgba(15,23,42,0.2)" strokeWidth={1.5} strokeDasharray="4 3" />
-            <g transform={`translate(${tx},${P})`}>
-              <rect rx={7} width={180} height={tipH} fill="rgba(15,23,42,0.88)" />
-              {items.map((item, i) => (
-                <g key={item.label} transform={`translate(10,${14 + i * 18})`}>
-                  <rect x={0} y={-8} width={8} height={8} rx={2} fill={item.color} />
-                  <text x={12} y={0} fill="white" fontSize={11} fontFamily="IBM Plex Sans, sans-serif">
-                    {item.label.length > 10 ? item.label.slice(0, 9) + '…' : item.label}:
-                    <tspan fontWeight={700}> {Math.round(item.value).toLocaleString()}</tspan>
-                  </text>
-                </g>
-              ))}
-            </g>
-          </g>
-        );
-      })()}
-    </svg>
-  );
-}
-
-function MixCompareChart({ scenarios }: { scenarios: Array<SavedScenario & { color: string }> }) {
-  const allCarriers = Array.from(
-    new Set(scenarios.flatMap((sc) => sc.results!.carrierMix.map((m) => m.label)))
-  );
-  const W = 680, rowH = 40, PT = 24, PL = 110, PR = 20, PB = 8;
-  const H = PT + scenarios.length * rowH + PB;
-  const maxTotal = Math.max(
-    ...scenarios.map((sc) => sc.results!.carrierMix.reduce((s, m) => s + m.value, 0)),
-    1,
-  );
-  return (
-    <div className="sc-mix-chart-wrap">
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
-        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-          <g key={t}>
-            <line x1={PL + t * (W - PL - PR)} x2={PL + t * (W - PL - PR)}
-              y1={PT} y2={H - PB} stroke="rgba(15,23,42,0.08)" strokeWidth={1} />
-            <text x={PL + t * (W - PL - PR)} y={PT - 6} textAnchor="middle"
-              fontSize={9} fill="#94a3b8" fontFamily="IBM Plex Sans, sans-serif">
-              {Math.round(maxTotal * t).toLocaleString()}
-            </text>
-          </g>
-        ))}
-        {scenarios.map((sc, si) => {
-          const mix = sc.results!.carrierMix;
-          const total = mix.reduce((s, m) => s + m.value, 0);
-          const y = PT + si * rowH;
-          let x = PL;
-          return (
-            <g key={sc.id}>
-              <text x={PL - 6} y={y + rowH / 2 + 4} textAnchor="end"
-                fontSize={10} fill={sc.color} fontWeight={700} fontFamily="IBM Plex Sans, sans-serif">
-                {sc.name.length > 10 ? sc.name.slice(0, 9) + '…' : sc.name}
-              </text>
-              {mix.map((m) => {
-                const segW = (m.value / maxTotal) * (W - PL - PR);
-                const segX = x;
-                x += segW;
-                return (
-                  <g key={m.label}>
-                    <rect x={segX} y={y + 4} width={segW} height={rowH - 12}
-                      fill={CARRIER_COLORS[m.label] ?? m.color} fillOpacity={0.85} rx={2}>
-                      <title>{m.label}: {Math.round(m.value).toLocaleString()} MWh</title>
-                    </rect>
-                    {segW > 28 && (
-                      <text x={segX + segW / 2} y={y + rowH / 2 + 3}
-                        textAnchor="middle" fontSize={9} fill="white"
-                        fontFamily="IBM Plex Sans, sans-serif" fontWeight={600}>
-                        {m.label}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-              <text x={PL + (total / maxTotal) * (W - PL - PR) + 4} y={y + rowH / 2 + 4}
-                fontSize={9} fill="#64748b" fontFamily="IBM Plex Sans, sans-serif">
-                {Math.round(total).toLocaleString()} MWh
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div className="sc-mix-legend">
-        {allCarriers.map((c) => (
-          <div key={c} className="legend-item-inline">
-            <span className="legend-swatch" style={{ backgroundColor: CARRIER_COLORS[c] ?? '#94a3b8' }} />
-            <span>{c}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ScenarioCompareView({
-  scenarios,
-  onBack,
-}: {
-  scenarios: SavedScenario[];
-  onBack: () => void;
-}) {
-  const done = scenarios.filter((s) => s.status === 'done' && s.results);
-  const colored = done.map((sc, i) => ({ ...sc, color: SCENARIO_COLORS[i % SCENARIO_COLORS.length] }));
-
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(colored.map((s) => s.id)));
-  const [baselineId, setBaselineId] = useState<string>(colored[0]?.id ?? '');
-  const [activeSub, setActiveSub] = useState<CompareSub>('kpis');
-  const [tsMetric, setTsMetric] = useState<TsMetric>('price');
-
-  const selected = colored.filter((sc) => selectedIds.has(sc.id));
-  if (selected.length === 0) return <p className="empty-text">Select at least one scenario above.</p>;
-
-  const toggleId = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id) && next.size > 1) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  // KPI: extract numeric values from summary
-  const kpiDefs: Array<{ key: string; label: string; unit: string; extract: (r: RunResults) => number }> = [
-    { key: 'emissions', label: 'System emissions', unit: 'ktCO₂e',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('emiss'))?.value ?? '0') },
-    { key: 'price', label: 'Peak price', unit: '$/MWh',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('price'))?.value ?? '0') },
-    { key: 'capacity', label: 'Installed capacity', unit: 'MW',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('capacity'))?.value ?? '0') },
-    { key: 'demand', label: 'Peak demand', unit: 'MW',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('demand'))?.value ?? '0') },
-    { key: 'reserve', label: 'Reserve position', unit: 'MW',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('reserve'))?.value ?? '0') },
-    { key: 'txstress', label: 'Tx stress', unit: '%',
-      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('transm'))?.value ?? '0') },
-  ];
-
-  const tsLabels: Record<TsMetric, string> = {
-    price: 'System marginal price ($/MWh)',
-    emissions: 'Hourly CO₂ emissions (t/h)',
-    dispatch: 'Total dispatch (MW)',
-    storage: 'Storage state of charge (MWh)',
-  };
-
-  return (
-    <div className="sc-compare-view">
-      {/* Header */}
-      <div className="sc-compare-header">
-        <button className="tb-btn" onClick={onBack}>← Setup</button>
-        <div className="sc-selector-chips">
-          {colored.map((sc) => (
-            <button
-              key={sc.id}
-              className={`sc-selector-chip${selectedIds.has(sc.id) ? ' sc-selector-chip--on' : ''}`}
-              style={{ '--chip-color': sc.color } as React.CSSProperties}
-              onClick={() => toggleId(sc.id)}
-            >
-              <span className="sc-selector-dot" />
-              {sc.name}
-            </button>
-          ))}
-        </div>
-        <label className="sc-baseline-label">
-          Baseline:
-          <select className="sc-baseline-select" value={baselineId}
-            onChange={(e) => setBaselineId(e.target.value)}>
-            {selected.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
-          </select>
-        </label>
-      </div>
-
-      {/* Sub-tab nav */}
-      <div className="sc-compare-subnav">
-        {(['kpis', 'ts', 'mix'] as CompareSub[]).map((sub) => (
-          <button key={sub} className={`sc-compare-subtab${activeSub === sub ? ' is-active' : ''}`}
-            onClick={() => setActiveSub(sub)}>
-            {sub === 'kpis' ? 'KPIs' : sub === 'ts' ? 'Time Series' : 'Energy Mix'}
-          </button>
-        ))}
-      </div>
-
-      {/* KPIs tab */}
-      {activeSub === 'kpis' && (
-        <div className="sc-kpi-grid">
-          {kpiDefs.map((kd) => (
-            <MiniBarChart
-              key={kd.key}
-              title={kd.label}
-              unit={kd.unit}
-              baselineId={baselineId}
-              bars={selected.map((sc) => ({
-                id: sc.id,
-                label: sc.name,
-                value: kd.extract(sc.results!),
-                color: sc.color,
-              }))}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Time Series tab */}
-      {activeSub === 'ts' && (
-        <div className="sc-ts-wrap">
-          <div className="sc-ts-controls">
-            {(Object.keys(tsLabels) as TsMetric[]).map((m) => (
-              <button key={m}
-                className={`tb-btn${tsMetric === m ? ' tb-btn--active' : ''}`}
-                onClick={() => setTsMetric(m)}>
-                {m === 'price' ? 'Price' : m === 'emissions' ? 'Emissions' : m === 'dispatch' ? 'Dispatch' : 'Storage SoC'}
-              </button>
-            ))}
-          </div>
-          <p className="sc-ts-subtitle">{tsLabels[tsMetric]}</p>
-          <div className="chart-shell">
-            <div className="chart-main">
-              <TsCompareChart metric={tsMetric} scenarios={selected} />
-            </div>
-            <div className="chart-legend chart-legend-side">
-              {selected.map((sc) => (
-                <div key={sc.id} className="legend-item-inline">
-                  <span className="legend-swatch" style={{ backgroundColor: sc.color }} />
-                  <span>{sc.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Energy Mix tab */}
-      {activeSub === 'mix' && (
-        <div className="sc-mix-wrap">
-          <p className="sc-ts-subtitle">Total energy dispatched by carrier (MWh) — hover segments for details</p>
-          <MixCompareChart scenarios={selected} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Scenarios Pane ──────────────────────────────────────────────────────────
-
-interface ScenariosPaneProps {
-  scenarios: SavedScenario[];
-  activeId: string;
-  maxSnapshots: number;
-  onSetActive: (id: string) => void;
-  onClone: (id: string) => void;
-  onDelete: (id: string) => void;
-  onRun: (id: string) => void;
-  onRename: (id: string, name: string) => void;
-  onUpdateParam: (id: string, key: keyof ScenarioSettings, value: number | string) => void;
-  onUpdateRunSettings: (id: string, key: keyof RunSettings, value: number) => void;
-}
-
-const SCENARIO_PARAM_FIELDS: Array<{ key: keyof ScenarioSettings; label: string; unit: string; min: number; max: number; step: number; tooltip: string }> = [
-  { key: 'demandGrowth', label: 'Demand growth', unit: '%', min: -10, max: 50, step: 0.5,
-    tooltip: 'Scales all load p_set values by (1 + value/100). E.g. 10% means all loads become 1.1× their workbook values.' },
-  { key: 'carbonPrice', label: 'Carbon price', unit: '$/t', min: 0, max: 500, step: 5,
-    tooltip: 'Added to each generator\'s marginal cost as carbon_price × CO₂ emission factor (t/MWh). Makes fossil fuels more expensive, pushing the optimizer toward renewables.' },
-  { key: 'renewableTarget', label: 'RE min share', unit: '%', min: 0, max: 100, step: 1,
-    tooltip: 'Enforces a minimum renewable energy share of dispatch. Also scales Solar/Wind/Hydro installed capacity by (1 + value/100) so the model can physically achieve the target. 50% = at least half of all energy must come from Solar/Wind/Hydro.' },
-  { key: 'storageExpansion', label: 'Storage add', unit: 'MW', min: 0, max: 10000, step: 100,
-    tooltip: 'Adds a system-level battery (BESS) of this MW at the peak load bus. 0 = no additional storage.' },
-  { key: 'transmissionExpansion', label: 'Tx expansion', unit: '%', min: 0, max: 100, step: 5,
-    tooltip: 'Scales all transmission line and transformer s_nom by (1 + value/100). E.g. 10% means every line gets 1.1× its rated capacity.' },
-];
-
-const STATUS_LABEL: Record<SavedScenario['status'], string> = {
-  idle: 'Not run',
-  running: 'Running…',
-  done: 'Done',
-  error: 'Error',
-};
-
-function ScenarioStatusBadge({ status }: { status: SavedScenario['status'] }) {
-  return (
-    <span className={`sc-status sc-status--${status}`}>{STATUS_LABEL[status]}</span>
-  );
-}
-
-function ScenariosPane({
-  scenarios, activeId, maxSnapshots,
-  onSetActive, onClone, onDelete, onRun, onRename, onUpdateParam, onUpdateRunSettings,
-}: ScenariosPaneProps) {
-  const [compareMode, setCompareMode] = useState(false);
-  const doneScenarios = scenarios.filter((s) => s.status === 'done' && s.results);
-
-  if (compareMode) {
-    return (
-      <div className="scenarios-pane">
-        <ScenarioCompareView scenarios={scenarios} onBack={() => setCompareMode(false)} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="scenarios-pane">
-      {/* Header */}
-      <div className="scenarios-header">
-        <div>
-          <p className="eyebrow">Scenario Manager</p>
-          <h2>Scenarios</h2>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {doneScenarios.length >= 2 && (
-            <button className="tb-btn" onClick={() => setCompareMode(true)}>
-              Compare ({doneScenarios.length})
-            </button>
-          )}
-          <button className="run-button" onClick={() => onClone(activeId)}>+ New Scenario</button>
-        </div>
-      </div>
-
-      {/* Scenario cards */}
-      <div className="scenarios-list">
-        {scenarios.map((sc) => {
-          const isActive = sc.id === activeId;
-          return (
-            <div key={sc.id} className={`sc-card${isActive ? ' sc-card--active' : ''}`}>
-              {/* Card header row */}
-              <div className="sc-card-header">
-                <input
-                  className="sc-name-input"
-                  value={sc.name}
-                  onChange={(e) => onRename(sc.id, e.target.value)}
-                  onClick={() => onSetActive(sc.id)}
-                />
-                <ScenarioStatusBadge status={sc.status} />
-                {sc.ranAt && (
-                  <span className="sc-ran-at">
-                    {new Date(sc.ranAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-                <div className="sc-card-actions">
-                  {!isActive && (
-                    <button className="tb-btn" onClick={() => onSetActive(sc.id)}>Select</button>
-                  )}
-                  <button className="tb-btn" onClick={() => onClone(sc.id)}>Clone</button>
-                  <button
-                    className="run-button"
-                    style={{ fontSize: '0.78rem', padding: '4px 12px' }}
-                    disabled={sc.status === 'running'}
-                    onClick={() => onRun(sc.id)}
-                  >
-                    {sc.status === 'running' ? 'Running…' : 'Run'}
-                  </button>
-                  {scenarios.length > 1 && (
-                    <button className="tb-btn tb-btn--muted" onClick={() => onDelete(sc.id)}>✕</button>
-                  )}
-                </div>
-              </div>
-
-              {/* Param grid */}
-              <div className="sc-params">
-                {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step, tooltip }) => (
-                  <label key={key} className="sc-param">
-                    <span className="sc-param-label" title={tooltip}>
-                      {label}
-                      <span className="sc-param-info" title={tooltip}>ⓘ</span>
-                    </span>
-                    <div className="sc-param-input-row">
-                      <input
-                        type="number"
-                        className="sc-param-input"
-                        value={sc.params[key] as number}
-                        min={min} max={max} step={step}
-                        onChange={(e) => onUpdateParam(sc.id, key, parseFloat(e.target.value) || 0)}
-                      />
-                      <span className="sc-param-unit">{unit}</span>
-                    </div>
-                  </label>
-                ))}
-                {maxSnapshots > 1 && (
-                  <label className="sc-param">
-                    <span className="sc-param-label">Snapshots</span>
-                    <div className="sc-param-input-row">
-                      <input
-                        type="number"
-                        className="sc-param-input"
-                        value={sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart}
-                        min={1} max={maxSnapshots} step={1}
-                        onChange={(e) => {
-                          const v = Math.min(maxSnapshots, Math.max(1, parseInt(e.target.value) || 1));
-                          onUpdateRunSettings(sc.id, 'snapshotEnd', sc.runSettings.snapshotStart + v);
-                        }}
-                      />
-                      <span className="sc-param-unit">of {maxSnapshots}</span>
-                    </div>
-                  </label>
-                )}
-              </div>
-
-              {sc.status === 'error' && sc.errorMsg && (
-                <p className="sc-error-msg">{sc.errorMsg}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Comparison table */}
-      {doneScenarios.length >= 2 && (
-        <div className="sc-comparison">
-          <p className="sc-section-title">Comparison — {doneScenarios.length} completed scenarios</p>
-          <div className="sc-comparison-table-wrap">
-            <table className="sc-comparison-table">
-              <thead>
-                <tr>
-                  <th>Scenario</th>
-                  <th>Total cost</th>
-                  <th>CO₂ emissions</th>
-                  <th>Load shedding</th>
-                  <th>RE share</th>
-                  <th>Snapshots</th>
-                </tr>
-              </thead>
-              <tbody>
-                {doneScenarios.map((sc) => {
-                  const sum = sc.results!.summary;
-                  const get = (label: string) => sum.find((s) => s.label.toLowerCase().includes(label.toLowerCase()))?.value ?? '—';
-                  return (
-                    <tr
-                      key={sc.id}
-                      className={sc.id === activeId ? 'sc-comparison-active' : ''}
-                      onClick={() => onSetActive(sc.id)}
-                    >
-                      <td><strong>{sc.name}</strong></td>
-                      <td>{get('cost')}</td>
-                      <td>{get('emiss')}</td>
-                      <td>{get('shedding') !== '—' ? get('shedding') : get('shed')}</td>
-                      <td>{get('renew')}</td>
-                      <td>{sc.results!.runMeta.snapshotCount}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function makeScenario(
-  name: string,
-  params: ScenarioSettings = DEFAULT_SCENARIO,
-  runSettings: RunSettings = DEFAULT_RUN_SETTINGS,
-): SavedScenario {
-  return {
-    id: `sc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    name,
-    params,
-    runSettings,
-    status: 'idle',
-    results: null,
-    createdAt: Date.now(),
-    ranAt: null,
-    errorMsg: null,
-  };
-}
-
-const _INIT_SCENARIO = makeScenario('Base Case');
-
-/** Derive the max snapshot count exclusively from the workbook's snapshots sheet.
- *  'now' or empty → 1 (static single-period model).
- *  Real datetime rows → their count.
- *  Never fall back to a config value — the workbook is the only source of truth. */
-function snapshotMaxFromWorkbook(rows: GridRow[]): number {
-  if (!rows || rows.length === 0) return 1;
-  if (rows.length === 1) {
-    const label = String(
-      rows[0].snapshot ?? rows[0].name ?? rows[0].datetime ?? ''
-    ).trim().toLowerCase();
-    if (label === 'now' || label === '') return 1;
-  }
-  return rows.length;
-}
 
 /* ── Sidebar collapsible group ─────────────────────────────────────────── */
 function SidebarGroup({
@@ -2357,26 +1675,14 @@ function GlobalConstraintsSection({
 function App() {
   const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
   const [tab, setTab] = useState<WorkspaceTab>('Map');
-  const [scenarios, setScenarios] = useState<SavedScenario[]>([_INIT_SCENARIO]);
-  const [activeId, setActiveId] = useState<string>(_INIT_SCENARIO.id);
+  const [results, setResults] = useState<RunResults | null>(null);
+  const [runStatus, setRunStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [maxSnapshots, setMaxSnapshots] = useState<number>(1);
+  const [snapshotStart, setSnapshotStart] = useState(0);
+  const [snapshotEnd, setSnapshotEnd] = useState(24);
+  const [snapshotWeight, setSnapshotWeight] = useState(1);
   const [constraints, setConstraints] = useState<CustomConstraint[]>(DEFAULT_CONSTRAINTS);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  // Derived from active scenario
-  const activeScenario = scenarios.find((s) => s.id === activeId) ?? scenarios[0];
-  const scenario = activeScenario.params;
-  const runSettings = activeScenario.runSettings;
-  const results = activeScenario.results;
-
-  const patchScenario = (id: string, patch: Partial<SavedScenario>) =>
-    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-
-  const setRunSettings = (update: RunSettings | ((prev: RunSettings) => RunSettings)) =>
-    setScenarios((prev) => prev.map((s) => {
-      if (s.id !== activeId) return s;
-      return { ...s, runSettings: typeof update === 'function' ? update(s.runSettings) : update };
-    }));
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
@@ -2389,7 +1695,7 @@ function App() {
     snapshotCount: number;
     networkSummary: Record<string, number>;
   } | null>(null);
-  const [status, setStatus] = useState('Ready. Import a workbook or edit the demo model.');
+  const [status, setStatus] = useState('Ready. Open a workbook or try the demo model.');
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
   const [filename, setFilename] = useState('pypsa_studio_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2399,23 +1705,16 @@ function App() {
       if (!sampleModel) return;
       const snapshotMax = snapshotMaxFromWorkbook(sampleModel.snapshots);
       setMaxSnapshots(snapshotMax);
+      setSnapshotEnd(Math.min(24, snapshotMax));
       setModel(sampleModel);
-      setScenarios((prev) => prev.map((s) => ({
-        ...s,
-        runSettings: { ...s.runSettings, snapshotEnd: Math.min(s.runSettings.snapshotEnd, snapshotMax) },
-      })));
     }).catch(() => null);
   }, []);
-
 
   const bounds = useMemo(() => getBounds(model), [model.buses]);  // eslint-disable-line react-hooks/exhaustive-deps
   const busIndex = useMemo(() => getBusIndex(model), [model.buses]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!results) {
-      setAnalyticsFocus({ type: 'system' });
-      return;
-    }
+    if (!results) { setAnalyticsFocus({ type: 'system' }); return; }
     if (analyticsFocus.type === 'system') return;
     if (analyticsFocus.type === 'generator' && results.assetDetails.generators[analyticsFocus.key]) return;
     if (analyticsFocus.type === 'bus' && results.assetDetails.buses[analyticsFocus.key]) return;
@@ -2425,52 +1724,19 @@ function App() {
     setAnalyticsFocus({ type: 'system' });
   }, [results, analyticsFocus]);
 
-
   const resetForNewModel = (nextModel: WorkbookModel, name?: string) => {
     const snapshotMax = snapshotMaxFromWorkbook(nextModel.snapshots);
     setMaxSnapshots(snapshotMax);
+    setSnapshotEnd(Math.min(24, snapshotMax));
+    setSnapshotStart(0);
     setModel(nextModel);
+    setResults(null);
+    setRunStatus('idle');
     setChartSections([]);
     setValidateResult(null);
     setAnalyticsFocus({ type: 'system' });
-    setScenarios((prev) => prev.map((s) => ({
-      ...s,
-      results: null,
-      status: 'idle' as const,
-      errorMsg: null,
-      runSettings: { ...DEFAULT_RUN_SETTINGS, snapshotEnd: Math.min(DEFAULT_RUN_SETTINGS.snapshotEnd, snapshotMax) },
-    })));
     if (name) setFilename(name);
   };
-
-  // ── Scenario management handlers ────────────────────────────────────────
-  const handleCloneScenario = (id: string) => {
-    const src = scenarios.find((s) => s.id === id) ?? activeScenario;
-    const clone = makeScenario(`${src.name} (copy)`, { ...src.params }, { ...src.runSettings });
-    setScenarios((prev) => [...prev, clone]);
-    setActiveId(clone.id);
-  };
-
-  const handleDeleteScenario = (id: string) => {
-    setScenarios((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      if (activeId === id) setActiveId(next[0]?.id ?? '');
-      return next;
-    });
-  };
-
-  const handleRenameScenario = (id: string, name: string) =>
-    patchScenario(id, { name });
-
-  const handleUpdateScenarioParam = (id: string, key: keyof ScenarioSettings, value: number | string) =>
-    setScenarios((prev) => prev.map((s) =>
-      s.id === id ? { ...s, params: { ...s.params, [key]: value } } : s
-    ));
-
-  const handleUpdateScenarioRunSettings = (id: string, key: keyof RunSettings, value: number) =>
-    setScenarios((prev) => prev.map((s) =>
-      s.id === id ? { ...s, runSettings: { ...s.runSettings, [key]: value } } : s
-    ));
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2573,20 +1839,15 @@ function App() {
     }
   };
 
-  const handleRunModel = async (targetId?: string) => {
-    const runId = targetId ?? activeId;
-    const sc = scenarios.find((s) => s.id === runId) ?? activeScenario;
-    setRunDialogOpen(false);
-    const snapshotCount = sc.runSettings.snapshotEnd - sc.runSettings.snapshotStart;
+  const handleRunModel = async () => {
+    const snapshotCount = snapshotEnd - snapshotStart;
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled) },
-      options: {
-        snapshotCount,
-        snapshotStart: sc.runSettings.snapshotStart,
-        snapshotWeight: sc.runSettings.snapshotWeight,
-      },
+      options: { snapshotCount, snapshotStart, snapshotWeight },
     };
+
+    setRunDialogOpen(false);
 
     if (dryRun) {
       setStatus('Validating model structure...');
@@ -2599,15 +1860,15 @@ function App() {
         const result = await response.json();
         setValidateResult(result);
         setTab('Validation');
-        setStatus(result.valid ? 'Validation passed — model structure is valid.' : `Validation failed: ${result.errors.length} error(s).`);
+        setStatus(result.valid ? 'Validation passed.' : `Validation failed: ${result.errors.length} error(s).`);
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Validation request failed.');
       }
       return;
     }
 
-    patchScenario(runId, { status: 'running', errorMsg: null });
-    setStatus(`Running "${sc.name}" — ${snapshotCount} snapshots…`);
+    setRunStatus('running');
+    setStatus(`Running — ${snapshotCount} snapshots…`);
     try {
       const response = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
@@ -2619,14 +1880,14 @@ function App() {
         throw new Error(message || `Backend run failed with status ${response.status}.`);
       }
       const nextResults = (await response.json()) as RunResults;
-      patchScenario(runId, { status: 'done', results: nextResults, ranAt: Date.now() });
-      setActiveId(runId);
+      setResults(nextResults);
+      setRunStatus('done');
       setAnalyticsFocus({ type: 'system' });
       setTab('Analytics');
-      setStatus(`"${sc.name}" completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`);
+      setStatus(`Completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
-      patchScenario(runId, { status: 'error', errorMsg: msg });
+      setRunStatus('error');
       setStatus(msg);
     }
   };
@@ -2842,7 +2103,7 @@ function App() {
             <div className="case-chip">
               <span>Last run</span>
               <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h</strong>
-              <ScenarioStatusBadge status={activeScenario.status} />
+              <span className={`sc-status sc-status--${runStatus}`}>{runStatus === 'running' ? 'Running…' : runStatus === 'error' ? 'Error' : 'Done'}</span>
             </div>
           )}
           <span className="topbar-status" title={status}>{status}</span>
@@ -3086,7 +2347,7 @@ function App() {
                         <h2>Interactive analytics dashboard</h2>
                       </div>
                       <div className="inline-stats">
-                        <span>{scenario.caseName}</span>
+                        <span>{filename}</span>
                         <span>{results.runMeta.snapshotCount} snapshots</span>
                         <span>{results.runMeta.snapshotWeight} h weight</span>
                       </div>
@@ -3357,27 +2618,27 @@ function App() {
               <>
                 <div className="field" style={{ marginBottom: 16 }}>
                   <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                    Simulation window — <strong>{runSettings.snapshotEnd - runSettings.snapshotStart} snapshots</strong>
-                    {' '}(snapshot {runSettings.snapshotStart} → {runSettings.snapshotEnd} of {maxSnapshots})
+                    Simulation window — <strong>{snapshotEnd - snapshotStart} snapshots</strong>
+                    {' '}(snapshot {snapshotStart} → {snapshotEnd} of {maxSnapshots})
                   </span>
                   <DualRangeSlider
                     min={0} max={maxSnapshots}
-                    low={runSettings.snapshotStart} high={runSettings.snapshotEnd}
+                    low={snapshotStart} high={snapshotEnd}
                     formatLabel={(v) => `${v}`}
-                    onChange={(lo, hi) => setRunSettings((s) => ({ ...s, snapshotStart: lo, snapshotEnd: hi }))}
+                    onChange={(lo, hi) => { setSnapshotStart(lo); setSnapshotEnd(hi); }}
                   />
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                    Snapshot weight — <strong>{runSettings.snapshotWeight} h/snapshot</strong>
-                    {' '}({((runSettings.snapshotEnd - runSettings.snapshotStart) * runSettings.snapshotWeight).toFixed(0)} modeled hours)
+                    Snapshot weight — <strong>{snapshotWeight} h/snapshot</strong>
+                    {' '}({((snapshotEnd - snapshotStart) * snapshotWeight).toFixed(0)} modeled hours)
                   </span>
                   <DualRangeSlider
                     min={0} max={24}
-                    low={0} high={runSettings.snapshotWeight}
+                    low={0} high={snapshotWeight}
                     step={0.5}
                     formatLabel={(v) => `${v}h`}
-                    onChange={(_lo, hi) => setRunSettings((s) => ({ ...s, snapshotWeight: Math.max(0.5, hi) }))}
+                    onChange={(_lo, hi) => setSnapshotWeight(Math.max(0.5, hi))}
                   />
                 </div>
                 <p className="status-text" style={{ marginBottom: 12 }}>
