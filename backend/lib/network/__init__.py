@@ -27,23 +27,33 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     snapshot_rows = workbook_rows(model, "snapshots")
     wb_index = workbook_snapshot_index(snapshot_rows)
 
+    options = payload.options or {}
+    # step = temporal resolution: every `step`-th hourly snapshot is modelled;
+    # each kept snapshot carries snapshot_weightings = step (hours it represents).
+    # This matches the PyPSA convention: n.snapshots[::step] + weightings = step.
+    step = max(1, int(round(number(options.get("snapshotWeight"), 1.0))))
+
     if wb_index is not None:
-        snapshots = wb_index
-        # Honour per-row weighting if uniform; fall back to 1.0
-        snapshot_weight = number(snapshot_rows[0].get("objective"), 1.0) if snapshot_rows else 1.0
+        # Downsample workbook timestamps by the requested step.
+        snapshots = wb_index[::step]
+        snapshot_weight = float(step)
         snapshot_count = len(snapshots)
         notes.append(
-            f"Using {snapshot_count} workbook snapshots "
+            f"Using {snapshot_count} workbook snapshots at {step}h resolution "
             f"({snapshots[0]} → {snapshots[-1]})."
         )
     else:
-        snapshot_count, snapshot_weight, snapshot_start = snapshot_settings(payload)
+        window, _step, snapshot_start = snapshot_settings(payload)
         start_date = load_system_defaults().get("simulation", {}).get("start_date", "2024-01-01")
         start_ts = pd.Timestamp(start_date) + pd.Timedelta(hours=snapshot_start)
-        snapshots = pd.date_range(start_ts, periods=snapshot_count, freq="h")
+        # Generate the full hourly window, then keep every `step`-th snapshot.
+        hourly = pd.date_range(start_ts, periods=window, freq="h")
+        snapshots = hourly[::step]
+        snapshot_weight = float(step)
+        snapshot_count = len(snapshots)
         notes.append(
-            f"Static model: {snapshot_count} synthetic hourly snapshots "
-            f"starting {start_ts} at {snapshot_weight:g} h/snapshot."
+            f"Synthetic {snapshot_count} snapshots at {step}h resolution "
+            f"(window {window}h from {start_ts}; each snapshot = {step}h)."
         )
 
     period_factor = modeled_period_factor(snapshot_count, snapshot_weight)

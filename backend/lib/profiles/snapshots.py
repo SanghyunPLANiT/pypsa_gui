@@ -26,15 +26,27 @@ def workbook_snapshot_index(rows: list[dict[str, Any]]) -> pd.DatetimeIndex | No
         return None
 
 
-def snapshot_settings(payload: RunPayload) -> tuple[int, float, int]:
-    """Return (count, weight, start_offset) for synthetic snapshot generation."""
+def snapshot_settings(payload: RunPayload) -> tuple[int, int, int]:
+    """Return (window_hours, step, start_offset) for synthetic snapshot generation.
+
+    *window_hours* is the number of hourly steps in the requested window.
+    *step* is the temporal resolution: every ``step``-th hourly snapshot is kept
+    (e.g. step=4 → 4-hour resolution, matching PyPSA's ``n.snapshots[::4]`` +
+    ``n.snapshot_weightings.loc[:, :] = 4`` pattern).
+    *start_offset* is the starting hour offset.
+    """
     options = payload.options or {}
     max_snapshots = int(load_system_defaults().get("simulation", {}).get("max_snapshots", 8760))
-    count = int(max(1, min(max_snapshots, round(number(options.get("snapshotCount"), 24.0)))))
-    weight = max(0.1, number(options.get("snapshotWeight"), 1.0))
+    window = int(max(1, min(max_snapshots, round(number(options.get("snapshotCount"), 24.0)))))
+    step = max(1, int(round(number(options.get("snapshotWeight"), 1.0))))
     start = int(max(0, min(max_snapshots - 1, round(number(options.get("snapshotStart"), 0.0)))))
-    return count, weight, start
+    return window, step, start
 
 
 def modeled_period_factor(snapshot_count: int, snapshot_weight: float) -> float:
+    """Days represented by the model.
+
+    snapshot_count is the number of snapshots *after* downsampling,
+    snapshot_weight (= step) is the hours each snapshot represents.
+    """
     return snapshot_count * snapshot_weight / 24.0

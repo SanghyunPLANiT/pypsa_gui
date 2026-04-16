@@ -374,7 +374,7 @@ function App() {
           {results && (
             <div className="case-chip">
               <span>Last run</span>
-              <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h</strong>
+              <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h res</strong>
               <span className={`sc-status sc-status--${runStatus}`}>{runStatus === 'running' ? 'Running…' : runStatus === 'error' ? 'Error' : 'Done'}</span>
             </div>
           )}
@@ -511,8 +511,8 @@ function App() {
               <>
                 <div className="field" style={{ marginBottom: 16 }}>
                   <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                    Simulation window — <strong>{snapshotEnd - snapshotStart} snapshots</strong>
-                    {' '}(snapshot {snapshotStart} → {snapshotEnd} of {maxSnapshots})
+                    Simulation window — <strong>{snapshotEnd - snapshotStart} hourly steps</strong>
+                    {' '}(step {snapshotStart} → {snapshotEnd} of {maxSnapshots})
                   </span>
                   <DualRangeSlider
                     min={0} max={maxSnapshots}
@@ -522,20 +522,28 @@ function App() {
                   />
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
-                  <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                    Snapshot weight — <strong>{snapshotWeight} h/snapshot</strong>
-                    {' '}({((snapshotEnd - snapshotStart) * snapshotWeight).toFixed(0)} modeled hours)
-                  </span>
+                  {(() => {
+                    const step = Math.max(1, Math.round(snapshotWeight));
+                    const windowSize = snapshotEnd - snapshotStart;
+                    const modeledSnapshots = Math.ceil(windowSize / step);
+                    return (
+                      <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                        Time resolution — <strong>every {step}h</strong>
+                        {' '}({modeledSnapshots} snapshots of {windowSize} hourly steps · {windowSize}h window)
+                      </span>
+                    );
+                  })()}
                   <DualRangeSlider
-                    min={0} max={24}
-                    low={0} high={snapshotWeight}
-                    step={0.5}
+                    min={1} max={24}
+                    low={1} high={snapshotWeight}
+                    step={1}
                     formatLabel={(v) => `${v}h`}
-                    onChange={(_lo, hi) => setSnapshotWeight(Math.max(0.5, hi))}
+                    onChange={(_lo, hi) => setSnapshotWeight(Math.max(1, Math.round(hi)))}
                   />
                 </div>
                 <p className="status-text" style={{ marginBottom: 12 }}>
-                  Weighting rescales period-dependent constraints (e_sum_min, e_sum_max) proportionally.
+                  Resolution selects every Nth hourly step — <code>snapshots[::N]</code> with{' '}
+                  <code>snapshot_weightings = N</code>. Higher N = coarser resolution, faster solve.
                 </p>
               </>
             )}
