@@ -397,6 +397,9 @@ const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
   },
 };
 
+// Distinct colors for up to 7 scenarios in comparison charts
+const SCENARIO_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777'];
+
 // Carrier colors (sourced from public/sample_model.xlsx carriers sheet)
 const CARRIER_COLORS: Record<string, string> = {
   AC: '#475569', LNG: '#1f4e79', Coal: '#374151', Nuclear: '#7c3aed',
@@ -1511,6 +1514,409 @@ function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps)
   );
 }
 
+// ── Scenario Comparison View ─────────────────────────────────────────────────
+
+type CompareSub = 'kpis' | 'ts' | 'mix';
+type TsMetric = 'price' | 'emissions' | 'dispatch' | 'storage';
+
+function parseKpiNum(val: string): number {
+  const m = val.replace(/,/g, '').match(/-?[\d.]+/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+function MiniBarChart({
+  title,
+  unit,
+  bars,
+  baselineId,
+}: {
+  title: string;
+  unit: string;
+  bars: Array<{ id: string; label: string; value: number; color: string }>;
+  baselineId: string;
+}) {
+  const [hov, setHov] = useState<number | null>(null);
+  const W = 260, H = 160, PL = 8, PR = 8, PT = 28, PB = 32;
+  const iW = W - PL - PR;
+  const iH = H - PT - PB;
+  const maxV = Math.max(...bars.map((b) => Math.abs(b.value)), 1);
+  const bw = Math.max(4, iW / Math.max(bars.length, 1) - 8);
+  const baselineVal = bars.find((b) => b.id === baselineId)?.value ?? null;
+  return (
+    <div className="sc-mini-chart">
+      <p className="sc-mini-title">{title}</p>
+      <svg viewBox={`0 0 ${W} ${H}`} className="sc-mini-svg"
+        onMouseLeave={() => setHov(null)}>
+        {[0, 0.5, 1].map((t) => (
+          <line key={t} x1={PL} x2={W - PR}
+            y1={PT + iH - t * iH} y2={PT + iH - t * iH}
+            stroke="rgba(15,23,42,0.07)" strokeWidth={1} />
+        ))}
+        {bars.map((b, i) => {
+          const bh = (Math.abs(b.value) / maxV) * iH;
+          const cx = PL + i * (iW / bars.length) + (iW / bars.length - bw) / 2;
+          const isHov = hov === i;
+          return (
+            <g key={b.id}
+              onMouseEnter={() => setHov(i)}
+              onMouseLeave={() => setHov(null)}
+              style={{ cursor: 'default' }}>
+              <rect x={cx} y={PT + iH - bh} width={bw} height={bh}
+                fill={b.color} fillOpacity={isHov ? 1 : 0.8} rx={3} />
+              <text x={cx + bw / 2} y={H - 4} textAnchor="middle"
+                fontSize={9} fill="#64748b" fontFamily="IBM Plex Sans, sans-serif">
+                {b.label.length > 8 ? b.label.slice(0, 7) + '…' : b.label}
+              </text>
+              {isHov && (
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect x={Math.min(cx + bw + 4, W - 120)} y={PT}
+                    width={110} height={baselineVal !== null ? 48 : 32}
+                    rx={6} fill="rgba(15,23,42,0.88)" />
+                  <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 14}
+                    fill="white" fontSize={11} fontWeight={700} fontFamily="IBM Plex Sans, sans-serif">
+                    {b.value.toLocaleString(undefined, { maximumFractionDigits: 1 })} {unit}
+                  </text>
+                  {baselineVal !== null && b.id !== baselineId && (
+                    <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 30}
+                      fill={b.value > baselineVal ? '#f87171' : '#4ade80'}
+                      fontSize={10} fontFamily="IBM Plex Sans, sans-serif">
+                      {b.value > baselineVal ? '+' : ''}
+                      {(((b.value - baselineVal) / (Math.abs(baselineVal) || 1)) * 100).toFixed(1)}% vs baseline
+                    </text>
+                  )}
+                  {b.id === baselineId && (
+                    <text x={Math.min(cx + bw + 10, W - 114)} y={PT + 30}
+                      fill="#94a3b8" fontSize={10} fontFamily="IBM Plex Sans, sans-serif">baseline</text>
+                  )}
+                </g>
+              )}
+            </g>
+          );
+        })}
+        <text x={W / 2} y={PT - 6} textAnchor="middle"
+          fontSize={10} fill="#94a3b8" fontFamily="IBM Plex Sans, sans-serif">{unit}</text>
+      </svg>
+    </div>
+  );
+}
+
+function TsCompareChart({
+  metric,
+  scenarios,
+}: {
+  metric: TsMetric;
+  scenarios: Array<SavedScenario & { color: string }>;
+}) {
+  const [hov, setHov] = useState<number | null>(null);
+  const W = 820, H = 320, P = 40;
+  const iW = W - P * 2, iH = H - P * 2;
+
+  const seriesData = scenarios.map((sc) => {
+    const r = sc.results!;
+    if (metric === 'price') return r.systemPriceSeries.map((p) => ({ t: p.timestamp, v: p.value }));
+    if (metric === 'emissions') return r.systemEmissionsSeries.map((p) => ({ t: p.timestamp, v: p.value }));
+    if (metric === 'dispatch') return r.dispatchSeries.map((p) => ({ t: p.timestamp, v: p.total ?? 0 }));
+    if (metric === 'storage') return r.storageSeries.map((p) => ({ t: p.timestamp, v: p.state }));
+    return [];
+  });
+
+  const maxLen = Math.max(...seriesData.map((d) => d.length), 1);
+  const allVals = seriesData.flatMap((d) => d.map((p) => p.v));
+  const maxV = Math.max(...allVals, 1);
+  const minV = Math.min(...allVals, 0);
+  const range = Math.max(maxV - minV, 1);
+
+  const xFor = (idx: number, len: number) => P + (idx / Math.max(len - 1, 1)) * iW;
+  const yFor = (v: number) => P + iH - ((v - minV) / range) * iH;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="chart-svg"
+      style={{ width: '100%' }}
+      onMouseLeave={() => setHov(null)}
+      onMouseMove={(e) => {
+        const svgEl = e.currentTarget as SVGSVGElement;
+        const pt = svgEl.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        const sp = pt.matrixTransform(svgEl.getScreenCTM()!.inverse());
+        const idx = Math.round(((sp.x - P) / iW) * (maxLen - 1));
+        setHov(Math.max(0, Math.min(maxLen - 1, idx)));
+      }}>
+      {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+        <g key={t}>
+          <line x1={P} x2={W - P} y1={P + iH - t * iH} y2={P + iH - t * iH} className="chart-grid" />
+          <text x={6} y={P + iH - t * iH + 4} className="chart-axis">
+            {Math.round(minV + range * t)}
+          </text>
+        </g>
+      ))}
+      {seriesData.map((pts, si) => {
+        if (!pts.length) return null;
+        const sc = scenarios[si];
+        const d = pts.map((p, i) =>
+          `${i === 0 ? 'M' : 'L'} ${xFor(i, pts.length)} ${yFor(p.v)}`
+        ).join(' ');
+        return <path key={sc.id} d={d} fill="none" stroke={sc.color} strokeWidth={2.5} strokeLinecap="round" />;
+      })}
+      {[0, Math.floor(maxLen / 4), Math.floor(maxLen / 2), Math.floor(3 * maxLen / 4), maxLen - 1]
+        .filter((i, idx, arr) => arr.indexOf(i) === idx && i < maxLen)
+        .map((i) => {
+          const t = seriesData[0]?.[i]?.t;
+          return (
+            <text key={i} x={xFor(i, maxLen)} y={H - 4} textAnchor="middle" className="chart-axis chart-axis-x">
+              {t ? (t.length > 10 ? t.slice(5, 13) : t) : i}
+            </text>
+          );
+        })}
+      {hov !== null && (() => {
+        const hx = xFor(hov, maxLen);
+        const items = scenarios.map((sc, si) => {
+          const v = seriesData[si]?.[Math.min(hov, seriesData[si].length - 1)]?.v ?? 0;
+          return { label: sc.name, color: sc.color, value: v };
+        });
+        const tipH = 20 + items.length * 18;
+        const tx = hx + 12 + 180 > W - P ? hx - 192 : hx + 12;
+        return (
+          <g style={{ pointerEvents: 'none' }}>
+            <line x1={hx} x2={hx} y1={P} y2={H - P} stroke="rgba(15,23,42,0.2)" strokeWidth={1.5} strokeDasharray="4 3" />
+            <g transform={`translate(${tx},${P})`}>
+              <rect rx={7} width={180} height={tipH} fill="rgba(15,23,42,0.88)" />
+              {items.map((item, i) => (
+                <g key={item.label} transform={`translate(10,${14 + i * 18})`}>
+                  <rect x={0} y={-8} width={8} height={8} rx={2} fill={item.color} />
+                  <text x={12} y={0} fill="white" fontSize={11} fontFamily="IBM Plex Sans, sans-serif">
+                    {item.label.length > 10 ? item.label.slice(0, 9) + '…' : item.label}:
+                    <tspan fontWeight={700}> {Math.round(item.value).toLocaleString()}</tspan>
+                  </text>
+                </g>
+              ))}
+            </g>
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
+function MixCompareChart({ scenarios }: { scenarios: Array<SavedScenario & { color: string }> }) {
+  const allCarriers = Array.from(
+    new Set(scenarios.flatMap((sc) => sc.results!.carrierMix.map((m) => m.label)))
+  );
+  const W = 680, rowH = 40, PT = 24, PL = 110, PR = 20, PB = 8;
+  const H = PT + scenarios.length * rowH + PB;
+  const maxTotal = Math.max(
+    ...scenarios.map((sc) => sc.results!.carrierMix.reduce((s, m) => s + m.value, 0)),
+    1,
+  );
+  return (
+    <div className="sc-mix-chart-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+          <g key={t}>
+            <line x1={PL + t * (W - PL - PR)} x2={PL + t * (W - PL - PR)}
+              y1={PT} y2={H - PB} stroke="rgba(15,23,42,0.08)" strokeWidth={1} />
+            <text x={PL + t * (W - PL - PR)} y={PT - 6} textAnchor="middle"
+              fontSize={9} fill="#94a3b8" fontFamily="IBM Plex Sans, sans-serif">
+              {Math.round(maxTotal * t).toLocaleString()}
+            </text>
+          </g>
+        ))}
+        {scenarios.map((sc, si) => {
+          const mix = sc.results!.carrierMix;
+          const total = mix.reduce((s, m) => s + m.value, 0);
+          const y = PT + si * rowH;
+          let x = PL;
+          return (
+            <g key={sc.id}>
+              <text x={PL - 6} y={y + rowH / 2 + 4} textAnchor="end"
+                fontSize={10} fill={sc.color} fontWeight={700} fontFamily="IBM Plex Sans, sans-serif">
+                {sc.name.length > 10 ? sc.name.slice(0, 9) + '…' : sc.name}
+              </text>
+              {mix.map((m) => {
+                const segW = (m.value / maxTotal) * (W - PL - PR);
+                const segX = x;
+                x += segW;
+                return (
+                  <g key={m.label}>
+                    <rect x={segX} y={y + 4} width={segW} height={rowH - 12}
+                      fill={CARRIER_COLORS[m.label] ?? m.color} fillOpacity={0.85} rx={2}>
+                      <title>{m.label}: {Math.round(m.value).toLocaleString()} MWh</title>
+                    </rect>
+                    {segW > 28 && (
+                      <text x={segX + segW / 2} y={y + rowH / 2 + 3}
+                        textAnchor="middle" fontSize={9} fill="white"
+                        fontFamily="IBM Plex Sans, sans-serif" fontWeight={600}>
+                        {m.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+              <text x={PL + (total / maxTotal) * (W - PL - PR) + 4} y={y + rowH / 2 + 4}
+                fontSize={9} fill="#64748b" fontFamily="IBM Plex Sans, sans-serif">
+                {Math.round(total).toLocaleString()} MWh
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="sc-mix-legend">
+        {allCarriers.map((c) => (
+          <div key={c} className="legend-item-inline">
+            <span className="legend-swatch" style={{ backgroundColor: CARRIER_COLORS[c] ?? '#94a3b8' }} />
+            <span>{c}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScenarioCompareView({
+  scenarios,
+  onBack,
+}: {
+  scenarios: SavedScenario[];
+  onBack: () => void;
+}) {
+  const done = scenarios.filter((s) => s.status === 'done' && s.results);
+  const colored = done.map((sc, i) => ({ ...sc, color: SCENARIO_COLORS[i % SCENARIO_COLORS.length] }));
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(colored.map((s) => s.id)));
+  const [baselineId, setBaselineId] = useState<string>(colored[0]?.id ?? '');
+  const [activeSub, setActiveSub] = useState<CompareSub>('kpis');
+  const [tsMetric, setTsMetric] = useState<TsMetric>('price');
+
+  const selected = colored.filter((sc) => selectedIds.has(sc.id));
+  if (selected.length === 0) return <p className="empty-text">Select at least one scenario above.</p>;
+
+  const toggleId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id) && next.size > 1) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // KPI: extract numeric values from summary
+  const kpiDefs: Array<{ key: string; label: string; unit: string; extract: (r: RunResults) => number }> = [
+    { key: 'emissions', label: 'System emissions', unit: 'ktCO₂e',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('emiss'))?.value ?? '0') },
+    { key: 'price', label: 'Peak price', unit: '$/MWh',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('price'))?.value ?? '0') },
+    { key: 'capacity', label: 'Installed capacity', unit: 'MW',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('capacity'))?.value ?? '0') },
+    { key: 'demand', label: 'Peak demand', unit: 'MW',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('demand'))?.value ?? '0') },
+    { key: 'reserve', label: 'Reserve position', unit: 'MW',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('reserve'))?.value ?? '0') },
+    { key: 'txstress', label: 'Tx stress', unit: '%',
+      extract: (r) => parseKpiNum(r.summary.find((s) => s.label.toLowerCase().includes('transm'))?.value ?? '0') },
+  ];
+
+  const tsLabels: Record<TsMetric, string> = {
+    price: 'System marginal price ($/MWh)',
+    emissions: 'Hourly CO₂ emissions (t/h)',
+    dispatch: 'Total dispatch (MW)',
+    storage: 'Storage state of charge (MWh)',
+  };
+
+  return (
+    <div className="sc-compare-view">
+      {/* Header */}
+      <div className="sc-compare-header">
+        <button className="tb-btn" onClick={onBack}>← Setup</button>
+        <div className="sc-selector-chips">
+          {colored.map((sc) => (
+            <button
+              key={sc.id}
+              className={`sc-selector-chip${selectedIds.has(sc.id) ? ' sc-selector-chip--on' : ''}`}
+              style={{ '--chip-color': sc.color } as React.CSSProperties}
+              onClick={() => toggleId(sc.id)}
+            >
+              <span className="sc-selector-dot" />
+              {sc.name}
+            </button>
+          ))}
+        </div>
+        <label className="sc-baseline-label">
+          Baseline:
+          <select className="sc-baseline-select" value={baselineId}
+            onChange={(e) => setBaselineId(e.target.value)}>
+            {selected.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {/* Sub-tab nav */}
+      <div className="sc-compare-subnav">
+        {(['kpis', 'ts', 'mix'] as CompareSub[]).map((sub) => (
+          <button key={sub} className={`sc-compare-subtab${activeSub === sub ? ' is-active' : ''}`}
+            onClick={() => setActiveSub(sub)}>
+            {sub === 'kpis' ? 'KPIs' : sub === 'ts' ? 'Time Series' : 'Energy Mix'}
+          </button>
+        ))}
+      </div>
+
+      {/* KPIs tab */}
+      {activeSub === 'kpis' && (
+        <div className="sc-kpi-grid">
+          {kpiDefs.map((kd) => (
+            <MiniBarChart
+              key={kd.key}
+              title={kd.label}
+              unit={kd.unit}
+              baselineId={baselineId}
+              bars={selected.map((sc) => ({
+                id: sc.id,
+                label: sc.name,
+                value: kd.extract(sc.results!),
+                color: sc.color,
+              }))}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Time Series tab */}
+      {activeSub === 'ts' && (
+        <div className="sc-ts-wrap">
+          <div className="sc-ts-controls">
+            {(Object.keys(tsLabels) as TsMetric[]).map((m) => (
+              <button key={m}
+                className={`tb-btn${tsMetric === m ? ' tb-btn--active' : ''}`}
+                onClick={() => setTsMetric(m)}>
+                {m === 'price' ? 'Price' : m === 'emissions' ? 'Emissions' : m === 'dispatch' ? 'Dispatch' : 'Storage SoC'}
+              </button>
+            ))}
+          </div>
+          <p className="sc-ts-subtitle">{tsLabels[tsMetric]}</p>
+          <div className="chart-shell">
+            <div className="chart-main">
+              <TsCompareChart metric={tsMetric} scenarios={selected} />
+            </div>
+            <div className="chart-legend chart-legend-side">
+              {selected.map((sc) => (
+                <div key={sc.id} className="legend-item-inline">
+                  <span className="legend-swatch" style={{ backgroundColor: sc.color }} />
+                  <span>{sc.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Energy Mix tab */}
+      {activeSub === 'mix' && (
+        <div className="sc-mix-wrap">
+          <p className="sc-ts-subtitle">Total energy dispatched by carrier (MWh) — hover segments for details</p>
+          <MixCompareChart scenarios={selected} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Scenarios Pane ──────────────────────────────────────────────────────────
 
 interface ScenariosPaneProps {
@@ -1526,12 +1932,17 @@ interface ScenariosPaneProps {
   onUpdateRunSettings: (id: string, key: keyof RunSettings, value: number) => void;
 }
 
-const SCENARIO_PARAM_FIELDS: Array<{ key: keyof ScenarioSettings; label: string; unit: string; min: number; max: number; step: number }> = [
-  { key: 'demandGrowth', label: 'Demand growth', unit: '%', min: -10, max: 50, step: 0.5 },
-  { key: 'carbonPrice', label: 'Carbon price', unit: '$/t', min: 0, max: 500, step: 5 },
-  { key: 'renewableTarget', label: 'RE target', unit: '%', min: 0, max: 100, step: 1 },
-  { key: 'storageExpansion', label: 'Storage add', unit: 'MW', min: 0, max: 10000, step: 100 },
-  { key: 'transmissionExpansion', label: 'Tx expansion', unit: '%', min: 0, max: 100, step: 5 },
+const SCENARIO_PARAM_FIELDS: Array<{ key: keyof ScenarioSettings; label: string; unit: string; min: number; max: number; step: number; tooltip: string }> = [
+  { key: 'demandGrowth', label: 'Demand growth', unit: '%', min: -10, max: 50, step: 0.5,
+    tooltip: 'Scales all load p_set values by (1 + value/100). E.g. 10% means all loads become 1.1× their workbook values.' },
+  { key: 'carbonPrice', label: 'Carbon price', unit: '$/t', min: 0, max: 500, step: 5,
+    tooltip: 'Added to each generator\'s marginal cost as carbon_price × CO₂ emission factor (t/MWh). Makes fossil fuels more expensive, pushing the optimizer toward renewables.' },
+  { key: 'renewableTarget', label: 'RE min share', unit: '%', min: 0, max: 100, step: 1,
+    tooltip: 'Enforces a minimum renewable energy share of dispatch. Also scales Solar/Wind/Hydro installed capacity by (1 + value/100) so the model can physically achieve the target. 50% = at least half of all energy must come from Solar/Wind/Hydro.' },
+  { key: 'storageExpansion', label: 'Storage add', unit: 'MW', min: 0, max: 10000, step: 100,
+    tooltip: 'Adds a system-level battery (BESS) of this MW at the peak load bus. 0 = no additional storage.' },
+  { key: 'transmissionExpansion', label: 'Tx expansion', unit: '%', min: 0, max: 100, step: 5,
+    tooltip: 'Scales all transmission line and transformer s_nom by (1 + value/100). E.g. 10% means every line gets 1.1× its rated capacity.' },
 ];
 
 const STATUS_LABEL: Record<SavedScenario['status'], string> = {
@@ -1551,7 +1962,16 @@ function ScenariosPane({
   scenarios, activeId, maxSnapshots,
   onSetActive, onClone, onDelete, onRun, onRename, onUpdateParam, onUpdateRunSettings,
 }: ScenariosPaneProps) {
+  const [compareMode, setCompareMode] = useState(false);
   const doneScenarios = scenarios.filter((s) => s.status === 'done' && s.results);
+
+  if (compareMode) {
+    return (
+      <div className="scenarios-pane">
+        <ScenarioCompareView scenarios={scenarios} onBack={() => setCompareMode(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="scenarios-pane">
@@ -1561,7 +1981,14 @@ function ScenariosPane({
           <p className="eyebrow">Scenario Manager</p>
           <h2>Scenarios</h2>
         </div>
-        <button className="run-button" onClick={() => onClone(activeId)}>+ New Scenario</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {doneScenarios.length >= 2 && (
+            <button className="tb-btn" onClick={() => setCompareMode(true)}>
+              Compare ({doneScenarios.length})
+            </button>
+          )}
+          <button className="run-button" onClick={() => onClone(activeId)}>+ New Scenario</button>
+        </div>
       </div>
 
       {/* Scenario cards */}
@@ -1605,9 +2032,12 @@ function ScenariosPane({
 
               {/* Param grid */}
               <div className="sc-params">
-                {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step }) => (
+                {SCENARIO_PARAM_FIELDS.map(({ key, label, unit, min, max, step, tooltip }) => (
                   <label key={key} className="sc-param">
-                    <span className="sc-param-label">{label}</span>
+                    <span className="sc-param-label" title={tooltip}>
+                      {label}
+                      <span className="sc-param-info" title={tooltip}>ⓘ</span>
+                    </span>
                     <div className="sc-param-input-row">
                       <input
                         type="number"
