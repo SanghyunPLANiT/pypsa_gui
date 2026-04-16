@@ -57,8 +57,10 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
                 return
             weights = n.snapshot_weightings["generators"]
             gen_p = n.model["Generator-p"]
-            re_total = (gen_p.sel(Generator=re_gens) * weights).sum()
-            all_total = (gen_p.sel(Generator=supply_gens) * weights).sum()
+            # In PyPSA/linopy the dimension is called 'name', not 'Generator'
+            dim = [d for d in gen_p.dims if d != "snapshot"][0]
+            re_total = (gen_p.sel({dim: re_gens}) * weights).sum()
+            all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
             target = re_target / 100.0
             n.model.add_constraints(
                 re_total >= target * all_total, name="min_renewable_share"
