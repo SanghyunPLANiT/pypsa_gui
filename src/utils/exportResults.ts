@@ -30,7 +30,7 @@ function pivotSeries(
 export function exportFullResults(
   model: WorkbookModel,
   results: RunResults,
-  baseFilename = 'pypsa_studio',
+  baseFilename = 'ragnarok',
 ): void {
   // Start from the input workbook so all model sheets are already in.
   const wb = buildWorkbook(model);

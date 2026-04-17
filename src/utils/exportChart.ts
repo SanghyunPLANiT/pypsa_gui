@@ -63,7 +63,7 @@ export async function exportChartToExcel(
   filename?: string,
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'PyPSA Studio';
+  workbook.creator = 'Ragnarok';
   workbook.created = new Date();
 
   // ── Data sheet ─────────────────────────────────────────────────────────────

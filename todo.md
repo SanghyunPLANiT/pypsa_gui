@@ -1,4 +1,4 @@
-# PyPSA Studio — Feature Roadmap
+# Ragnarok — Feature Roadmap
 
 > Organised **by topic**, not by priority.  
 > Each item carries **Criticality · Urgency · Complexity** ratings.
@@ -82,7 +82,7 @@ Pre-built datasets that let users start from a real country-level power system r
 
 | ID | Feature | Criticality | Urgency | Complexity | Notes |
 |----|---------|-------------|---------|------------|-------|
-| E1 | **Country-level power system database** — open-source, versioned, API-accessible dataset of generators, lines, buses, loads per country | 🔴 | High | XL | Transformative for the investor use case. Sources: PyPSA-Earth, PyPSA-Eur, ENTSO-E Transparency, GEM (Global Energy Monitor), IRENA, national TSO data. Managed as a separate repo/microservice. API returns PyPSA Studio workbook format. This is a major data engineering project. |
+| E1 | **Country-level power system database** — open-source, versioned, API-accessible dataset of generators, lines, buses, loads per country | 🔴 | High | XL | Transformative for the investor use case. Sources: PyPSA-Earth, PyPSA-Eur, ENTSO-E Transparency, GEM (Global Energy Monitor), IRENA, national TSO data. Managed as a separate repo/microservice. API returns Ragnarok workbook format. This is a major data engineering project. |
 | E2 | **IEA / governmental scenario overlays** — import capacity mix and demand projections from IEA WEO, IRENA, national energy plans | 🟠 | Medium | L | Overlay on E1 base: "replace 2030 IEA STEPS capacity mix onto Korea's network." Requires mapping IEA technology categories to PyPSA carriers. |
 | E3 | **SSP / RCP scenario overlays** — Shared Socioeconomic Pathways (SSP1–5) for demand; RCP (2.6 / 4.5 / 8.5) for emission budgets | 🟡 | Low | L | Academic and policy use. Data from IIASA SSP database. Drives demand growth rate and CO₂ cap in B1 ETS. |
 | E4 | **Fuel price database** — historical and projected coal, gas, oil, uranium prices by region with auto-population of generator marginal costs | 🟡 | Medium | M | Currently users hard-code marginal costs. Live/cached price feed (IEA, World Bank, EIA) would auto-populate `marginal_cost` for thermal generators. |

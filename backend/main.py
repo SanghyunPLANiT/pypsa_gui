@@ -10,7 +10,7 @@ from .lib.models import RunPayload
 from .lib.network import validate_model
 from .lib.results import run_pypsa
 
-app = FastAPI(title="PyPSA Studio Backend", version="0.1.0")
+app = FastAPI(title="Ragnarok Backend", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

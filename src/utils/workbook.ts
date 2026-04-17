@@ -73,7 +73,7 @@ export function buildWorkbook(model: WorkbookModel) {
   return workbook;
 }
 
-export function exportWorkbook(model: WorkbookModel, filename = 'pypsa_studio_case.xlsx') {
+export function exportWorkbook(model: WorkbookModel, filename = 'ragnarok_case.xlsx') {
   XLSX.writeFile(buildWorkbook(model), filename);
 }
 

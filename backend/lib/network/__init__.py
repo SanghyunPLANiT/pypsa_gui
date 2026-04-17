@@ -66,7 +66,7 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     network.name = text(
         workbook_rows(model, "network")[0].get("name")
         if workbook_rows(model, "network")
-        else "PyPSA Studio Case"
+        else "Ragnarok Case"
     )
 
     # Carriers

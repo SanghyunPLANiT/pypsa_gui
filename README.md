@@ -1,6 +1,10 @@
-# PyPSA GUI
+# Ragnarok
 
-This repository is a local React + FastAPI application for editing a PyPSA-style workbook, running a PyPSA optimization, and exploring the solved results in a map- and chart-based analytics view.
+**Free, open-source energy system modelling — built to destroy the market for expensive closed-source tools.**
+
+Ragnarok is a browser-based power system optimisation tool built on [PyPSA](https://pypsa.org). It lets power system analysts and energy investors build, solve, and analyse single-year dispatch and capacity expansion models without writing a line of code — and without a six-figure software licence.
+
+This repository is a local React + FastAPI application for editing a PyPSA-style workbook, running a PyPSA optimisation, and exploring the solved results in a map- and chart-based analytics dashboard.
 
 This README is written as a handoff document for another AI or engineer. It explains the current structure, how data flows through the app, where the key logic lives, and which parts are still fragile.
 

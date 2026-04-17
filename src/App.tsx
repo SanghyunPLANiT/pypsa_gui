@@ -56,7 +56,7 @@ function AppInner() {
   } | null>(null);
   const [status, setStatus] = useState('Ready. Open a workbook or try the demo model.');
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
-  const [filename, setFilename] = useState('pypsa_studio_case.xlsx');
+  const [filename, setFilename] = useState('ragnarok_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ function AppInner() {
     if (!file) return;
     try {
       const nextModel = await parseWorkbook(file);
-      resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
+      resetForNewModel(nextModel, file.name || 'ragnarok_case.xlsx');
       setFileHandle(null);
       setStatus(`Imported workbook: ${file.name}. Analytics will populate after the next run.`);
       showToast(`Opened ${file.name}`, 'success');
@@ -129,7 +129,7 @@ function AppInner() {
       });
       const file = await handle.getFile();
       const nextModel = await parseWorkbook(file);
-      resetForNewModel(nextModel, file.name || 'pypsa_studio_case.xlsx');
+      resetForNewModel(nextModel, file.name || 'ragnarok_case.xlsx');
       setFileHandle(handle);
       setStatus(`Opened workbook: ${file.name}`);
       showToast(`Opened ${file.name}`, 'success');
@@ -176,7 +176,7 @@ function AppInner() {
 
   const saveAsWorkbook = async () => {
     const saver = (window as any).showSaveFilePicker;
-    const suggestedName = filename || 'pypsa_studio_case.xlsx';
+    const suggestedName = filename || 'ragnarok_case.xlsx';
     if (!saver) {
       const requested = window.prompt('Save workbook as', suggestedName) || suggestedName;
       exportWorkbook(model, requested);
@@ -392,7 +392,7 @@ function AppInner() {
       {/* ── Top bar ── */}
       <header className="topbar">
         <div className="topbar-left">
-          <span className="topbar-brand">PyPSA Studio</span>
+          <span className="topbar-brand">Ragnarok</span>
           <div className="topbar-divider" />
           <button className="run-button" onClick={() => setRunDialogOpen(true)}>▶ Run</button>
           <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
