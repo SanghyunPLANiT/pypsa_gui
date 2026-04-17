@@ -93,14 +93,14 @@ export function UserDefinedChartCard({
           </select>
         </label>
         <label className="chart-control">
-          <span>Timeframe</span>
+          <span>Group</span>
           <select value={section.timeframe} onChange={(event) => onChange({ ...section, timeframe: event.target.value as TimeframeOption })}>
-            <option value="aggregated">All aggregated</option>
-            <option value="yearly">Yearly</option>
-            <option value="monthly">Monthly</option>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
-            <option value="hourly">Hourly</option>
+            <option value="aggregated">All (aggregated)</option>
+            <option value="yearly">By year</option>
+            <option value="monthly">By month</option>
+            <option value="weekly">By week</option>
+            <option value="daily">By day</option>
+            <option value="hourly">By hour</option>
           </select>
         </label>
         <label className="chart-control">
@@ -114,7 +114,7 @@ export function UserDefinedChartCard({
         </label>
         {section.chartType !== 'donut' && (
           <label className="chart-control">
-            <span>Stacking</span>
+            <span>Stack</span>
             <select value={section.stacked ? 'stacked' : 'normal'} onChange={(event) => onChange({ ...section, stacked: event.target.value === 'stacked' })} disabled={!hasMetric}>
               <option value="stacked">Stacked</option>
               <option value="normal">Normal</option>
