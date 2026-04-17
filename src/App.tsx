@@ -20,9 +20,8 @@ import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook,
 import { exportFullResults } from './utils/exportResults';
 import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './utils/analytics';
-import { DualRangeSlider } from './components/common/DualRangeSlider';
-import { SidebarGroup } from './components/layout/SidebarGroup';
-import { GlobalConstraintsSection } from './components/constraints/GlobalConstraintsSection';
+import { RunDialog } from './components/common/RunDialog';
+import { Sidebar } from './components/layout/Sidebar';
 import { MapPane } from './components/panes/MapPane';
 import { TablesPane } from './components/panes/TablesPane';
 import { ValidationPane } from './components/panes/ValidationPane';
@@ -433,59 +432,25 @@ function AppInner() {
             {sidebarOpen ? '◂' : '▸'}
           </button>
           {sidebarOpen && (
-            <>
-              <SidebarGroup title="File" icon="📁" defaultOpen>
-                <div className="sg-btn-grid">
-                  <button className="tb-btn sg-full" onClick={handleOpenWorkbook}>Open</button>
-                  <button className="tb-btn sg-full" onClick={saveWorkbook}>Save</button>
-                  <button className="tb-btn sg-full" onClick={saveAsWorkbook}>Save As</button>
-                  <button className="tb-btn tb-btn--muted sg-full" onClick={() => {
-                    loadSampleWorkbook()
-                      .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
-                      .catch(() => setStatus('Could not reload sample model.'));
-                  }}>Demo</button>
-                  <button
-                    className="tb-btn sg-full"
-                    disabled={!results}
-                    title={results ? 'Export all inputs and outputs to Excel' : 'Run the model first to export results'}
-                    onClick={() => {
-                      if (!results) return;
-                      exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
-                      showToast('Full model exported to Excel', 'success');
-                    }}
-                  >
-                    Export
-                  </button>
-                </div>
-              </SidebarGroup>
-
-              <SidebarGroup
-                title="Constraints" icon="⛓"
-                badge={constraints.filter((c) => c.enabled).length > 0
-                  ? <span className="sg-badge">{constraints.filter((c) => c.enabled).length}</span>
-                  : undefined}
-              >
-                <GlobalConstraintsSection
-                  constraints={constraints}
-                  carriers={Array.from(new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)))}
-                  onChange={setConstraints}
-                />
-              </SidebarGroup>
-
-              {results && (
-                <SidebarGroup title="Results" icon="📊" defaultOpen>
-                  <div className="sg-summary">
-                    {results.summary.map((s) => (
-                      <div key={s.label} className="sg-summary-item">
-                        <span className="sg-summary-label">{s.label}</span>
-                        <span className="sg-summary-value">{s.value}</span>
-                        <span className="sg-summary-detail">{s.detail}</span>
-                      </div>
-                    ))}
-                  </div>
-                </SidebarGroup>
-              )}
-            </>
+            <Sidebar
+              model={model}
+              results={results}
+              constraints={constraints}
+              onConstraintsChange={setConstraints}
+              onOpen={handleOpenWorkbook}
+              onSave={saveWorkbook}
+              onSaveAs={saveAsWorkbook}
+              onDemo={() => {
+                loadSampleWorkbook()
+                  .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
+                  .catch(() => setStatus('Could not reload sample model.'));
+              }}
+              onExport={() => {
+                if (!results) return;
+                exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
+                showToast('Full model exported to Excel', 'success');
+              }}
+            />
           )}
         </aside>
 
@@ -541,108 +506,22 @@ function AppInner() {
       </div>
 
       {/* ── Run dialog ── */}
-      {runDialogOpen && (
-        <div className="modal-backdrop" onClick={() => setRunDialogOpen(false)}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <div className="panel-title-row">
-              <div>
-                <p className="eyebrow">Run</p>
-                <h2>Run configuration</h2>
-              </div>
-            </div>
-            {maxSnapshots <= 1 ? (
-              <div className="run-static-notice">
-                <strong>Static single-period model</strong>
-                <p>The workbook defines 1 snapshot (<code>now</code>). This runs as a single dispatch period.</p>
-              </div>
-            ) : (
-              <>
-                <div className="field" style={{ marginBottom: 16 }}>
-                  <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                    Simulation window — <strong>{snapshotEnd - snapshotStart} hourly steps</strong>
-                    {' '}(step {snapshotStart} → {snapshotEnd} of {maxSnapshots})
-                  </span>
-                  <DualRangeSlider
-                    min={0} max={maxSnapshots}
-                    low={snapshotStart} high={snapshotEnd}
-                    formatLabel={(v) => `${v}`}
-                    onChange={(lo, hi) => { setSnapshotStart(lo); setSnapshotEnd(hi); }}
-                  />
-                </div>
-                <div className="field" style={{ marginBottom: 8 }}>
-                  {(() => {
-                    const step = snapshotWeight;
-                    const windowSize = snapshotEnd - snapshotStart;
-                    const modeledSnapshots = Math.ceil(windowSize / step);
-                    return (
-                      <>
-                        <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
-                          Time resolution — <strong>every {step}h</strong>
-                          {' '}({modeledSnapshots} snapshots of {windowSize} hourly steps)
-                        </span>
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                          {[1, 2, 3, 4, 6, 8, 12, 24].map((n) => (
-                            <button
-                              key={n}
-                              className={`tb-btn${snapshotWeight === n ? '' : ' tb-btn--muted'}`}
-                              style={{ minWidth: 40 }}
-                              onClick={() => setSnapshotWeight(n)}
-                            >
-                              {n}h
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-                <p className="status-text" style={{ marginBottom: 12 }}>
-                  Resolution selects every Nth step — <code>snapshots[::N]</code> with{' '}
-                  <code>snapshot_weightings = N</code>. Higher N = coarser resolution, faster solve.
-                </p>
-              </>
-            )}
-            <div className="run-carbon-row">
-              <label className="run-carbon-label" htmlFor="run-carbon-price">
-                <span>💨 Carbon price</span>
-                <span className="run-carbon-unit">$/tCO₂</span>
-              </label>
-              <input
-                id="run-carbon-price"
-                type="number"
-                className="run-carbon-input"
-                min={0}
-                max={1000}
-                step={1}
-                value={carbonPrice}
-                onChange={(e) => setCarbonPrice(Math.max(0, parseFloat(e.target.value) || 0))}
-              />
-              {carbonPrice > 0 && (
-                <span className="run-carbon-hint">
-                  Added to each generator's marginal cost proportional to CO₂ emissions
-                </span>
-              )}
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={dryRun}
-                onChange={(e) => setDryRun(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '0.9rem' }}>
-                <strong>Dry run</strong> — validate model structure without optimising
-              </span>
-            </label>
-            <div className="modal-actions">
-              <button className="secondary-button" onClick={() => setRunDialogOpen(false)}>Cancel</button>
-              <button className="run-button" onClick={() => handleRunModel()}>
-                {dryRun ? 'Validate' : 'Run model'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RunDialog
+        open={runDialogOpen}
+        onClose={() => setRunDialogOpen(false)}
+        maxSnapshots={maxSnapshots}
+        snapshotStart={snapshotStart}
+        snapshotEnd={snapshotEnd}
+        snapshotWeight={snapshotWeight}
+        carbonPrice={carbonPrice}
+        dryRun={dryRun}
+        onSnapshotStartChange={setSnapshotStart}
+        onSnapshotEndChange={setSnapshotEnd}
+        onSnapshotWeightChange={setSnapshotWeight}
+        onCarbonPriceChange={setCarbonPrice}
+        onDryRunChange={setDryRun}
+        onRun={handleRunModel}
+      />
     </div>
   );
 }
