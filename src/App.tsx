@@ -266,7 +266,6 @@ function AppInner() {
       setResults(nextResults);
       setRunStatus('done');
       setAnalyticsFocus({ type: 'system' });
-      setTab('Analytics');
       const doneMsg = `Completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`;
       setStatus(doneMsg);
       showToast(doneMsg, 'success');
