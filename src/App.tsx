@@ -474,7 +474,6 @@ function AppInner() {
           <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
           <div className="topbar-divider" />
           <div className="case-chip">
-            <span>Workbook</span>
             <strong>{filename}</strong>
           </div>
           {results && (
