@@ -19,17 +19,17 @@ import {
   WorkspaceTab,
 } from './types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, EMPTY_METRIC_KEY } from './constants';
-import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './utils/workbook';
-import { exportFullResults } from './utils/exportResults';
-import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './utils/helpers';
-import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './utils/analytics';
-import { RunDialog } from './components/common/RunDialog';
-import { Sidebar } from './components/layout/Sidebar';
-import { MapPane } from './components/panes/MapPane';
-import { TablesPane } from './components/panes/TablesPane';
-import { ValidationPane } from './components/panes/ValidationPane';
-import { AnalyticsPane, EmptyAnalytics } from './components/panes/AnalyticsPane';
-import { ToastProvider, useToast } from './components/common/Toast';
+import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './shared/utils/workbook';
+import { exportFullResults } from './shared/utils/exportResults';
+import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './shared/utils/helpers';
+import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './shared/utils/analytics';
+import { RunDialog } from './features/run/RunDialog';
+import { Sidebar } from './layout/Sidebar';
+import { MapPane } from './features/map/MapPane';
+import { TablesPane } from './features/input/TablesPane';
+import { ValidationPane } from './features/validation/ValidationPane';
+import { AnalyticsPane, EmptyAnalytics } from './features/analytics/AnalyticsPane';
+import { ToastProvider, useToast } from './shared/components/Toast';
 
 function AppInner() {
   const { showToast } = useToast();
