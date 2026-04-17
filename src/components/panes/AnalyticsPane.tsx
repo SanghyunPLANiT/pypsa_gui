@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
-  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
+  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../types';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor, loadingColor } from '../../utils/helpers';
@@ -28,6 +28,7 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
+  runHistory: RunHistoryEntry[];
 }
 
 function EmptyAnalytics() {
@@ -50,6 +51,7 @@ export function AnalyticsPane({
   metricOptions,
   dispatchRows, dispatchSeries,
   systemLoadRows, systemPriceRows, storageRows,
+  runHistory,
 }: Props) {
   const focusTitle =
     analyticsFocus.type === 'system' ? 'System analytics' : analyticsFocus.key;
@@ -136,6 +138,7 @@ export function AnalyticsPane({
           systemLoadRows={systemLoadRows}
           systemPriceRows={systemPriceRows}
           storageRows={storageRows}
+          runHistory={runHistory}
         />
       )}
 

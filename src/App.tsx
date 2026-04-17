@@ -576,6 +576,7 @@ function AppInner() {
                 systemLoadRows={systemLoadRows}
                 systemPriceRows={systemPriceRows}
                 storageRows={storageRows}
+                runHistory={runHistory}
               />
             )
           )}
@@ -592,6 +593,7 @@ function AppInner() {
         snapshotWeight={snapshotWeight}
         carbonPrice={carbonPrice}
         dryRun={dryRun}
+        snapshots={model.snapshots}
         onSnapshotStartChange={setSnapshotStart}
         onSnapshotEndChange={setSnapshotEnd}
         onSnapshotWeightChange={setSnapshotWeight}

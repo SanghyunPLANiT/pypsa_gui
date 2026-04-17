@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../types';
+import { RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../types';
 import { numberValue } from '../../utils/helpers';
 import { exportChartToExcel } from '../../utils/exportChart';
 import { useToast } from '../common/Toast';
@@ -81,6 +81,95 @@ const COST_COLORS: Record<string, string> = {
   'Capital cost': '#6366f1',
 };
 
+// ── Run comparison table ──────────────────────────────────────────────────────
+
+function formatRelTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+interface RunComparisonTableProps {
+  runHistory: RunHistoryEntry[];
+  activeResults: RunResults;
+}
+
+function RunComparisonTable({ runHistory, activeResults }: RunComparisonTableProps) {
+  if (runHistory.length < 2) return null;
+
+  // Determine which column is the active one (match by reference equality)
+  const activeIdx = runHistory.findIndex((e) => e.results === activeResults);
+
+  const summaryLabels = runHistory[0].results.summary.map((s) => s.label);
+
+  const settingRows: Array<{ label: string; fn: (e: RunHistoryEntry) => string }> = [
+    { label: 'Carbon price',  fn: (e) => e.carbonPrice > 0 ? `$${e.carbonPrice}/t` : '—' },
+    { label: 'Window',        fn: (e) => `${e.snapshotStart} → ${e.snapshotEnd}` },
+    { label: 'Resolution',    fn: (e) => `${e.snapshotWeight}h` },
+    { label: 'Constraints',   fn: (e) => e.activeConstraints.length > 0
+        ? e.activeConstraints.map((c) => c.label).join(', ')
+        : '—' },
+  ];
+
+  return (
+    <div className="cmp-table-wrap">
+      <table className="cmp-table">
+        <thead>
+          <tr>
+            <th style={{ width: 140 }}></th>
+            {runHistory.map((entry, i) => (
+              <th
+                key={entry.id}
+                className={`cmp-th${i === activeIdx ? ' cmp-col--active' : ''}`}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{entry.label}</div>
+                <div style={{ fontWeight: 400, fontSize: '0.72rem', marginTop: 2 }}>
+                  {formatRelTime(entry.savedAt)}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {/* Settings section header */}
+          <tr className="cmp-section-header">
+            <td colSpan={runHistory.length + 1}>Settings</td>
+          </tr>
+          {settingRows.map((row) => (
+            <tr key={row.label}>
+              <td className="cmp-row-label">{row.label}</td>
+              {runHistory.map((entry, i) => (
+                <td key={entry.id} className={i === activeIdx ? 'cmp-col--active' : ''}>
+                  {row.fn(entry)}
+                </td>
+              ))}
+            </tr>
+          ))}
+
+          {/* Results section header */}
+          <tr className="cmp-section-header">
+            <td colSpan={runHistory.length + 1}>Results</td>
+          </tr>
+          {summaryLabels.map((label, si) => (
+            <tr key={label}>
+              <td className="cmp-row-label">{label}</td>
+              {runHistory.map((entry, i) => (
+                <td key={entry.id} className={i === activeIdx ? 'cmp-col--active' : ''}>
+                  {entry.results.summary[si]?.value ?? '—'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Main dashboard ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -90,6 +179,7 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
+  runHistory: RunHistoryEntry[];
 }
 
 export function ResultsDashboard({
@@ -99,6 +189,7 @@ export function ResultsDashboard({
   systemLoadRows,
   systemPriceRows,
   storageRows,
+  runHistory,
 }: Props) {
   const { showToast } = useToast();
 
@@ -300,6 +391,13 @@ export function ResultsDashboard({
           }} />
         </DashboardSection>
       </div>
+
+      {/* Run comparison table — shown when there are ≥ 2 history entries */}
+      {runHistory.length >= 2 && (
+        <DashboardSection title="Run comparison" defaultOpen>
+          <RunComparisonTable runHistory={runHistory} activeResults={results} />
+        </DashboardSection>
+      )}
     </div>
   );
 }
