@@ -5,6 +5,7 @@ import { TABLE_GROUPS } from '../../constants';
 import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes';
 import { getColumns, getTsFirstCol, stringValue } from '../../shared/utils/helpers';
 import { parseCsvToGridRows } from '../../shared/utils/workbook';
+import { InputAnalyser } from './InputAnalyser';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -406,6 +407,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
   const [navSearch, setNavSearch] = useState('');
   const [addColOpen, setAddColOpen] = useState(false);
   const [addColAnchor, setAddColAnchor] = useState<DOMRect | null>(null);
+  const [showAnalyser, setShowAnalyser] = useState(false);
   const addColBtnRef = useRef<HTMLButtonElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -578,6 +580,15 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
               </button>
             )}
             <span className="ts-chip">first col = snapshot label · remaining cols = component names</span>
+            {rows.length > 0 && (
+              <button
+                className={`ghost-button sm${showAnalyser ? ' ghost-button--active' : ''}`}
+                onClick={() => setShowAnalyser((v) => !v)}
+                title="Toggle input data analyser"
+              >
+                📊 Analyse
+              </button>
+            )}
           </div>
         ) : (
           <div className="section-toolbar">
@@ -604,6 +615,15 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
             >
               + Column
             </button>
+            {rows.length > 0 && (
+              <button
+                className={`ghost-button sm${showAnalyser ? ' ghost-button--active' : ''}`}
+                onClick={() => setShowAnalyser((v) => !v)}
+                title="Toggle input data analyser"
+              >
+                📊 Analyse
+              </button>
+            )}
           </div>
         )}
         {addColOpen && addColAnchor && (
@@ -613,6 +633,15 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
             anchorRect={addColAnchor}
             onAdd={(attr) => onAddColumn(sel.sheet as SheetName, attr.col, attr.default)}
             onClose={() => setAddColOpen(false)}
+          />
+        )}
+
+        {showAnalyser && rows.length > 0 && (
+          <InputAnalyser
+            rows={rows}
+            cols={cols}
+            isTs={isTs}
+            frozenCol={frozenCol}
           />
         )}
 
