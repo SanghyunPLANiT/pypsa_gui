@@ -66,79 +66,129 @@ def build_merit_order(network: pypsa.Network) -> list[dict[str, Any]]:
 
 # ── CO₂ shadow price ─────────────────────────────────────────────────────────
 
+def _linopy_dual(network: pypsa.Network, cname: str) -> float:
+    """Extract the dual variable of a linopy constraint by name.
+
+    Custom constraints added via n.model.add_constraints() live in the linopy
+    model, not in network.global_constraints.  PyPSA writes duals back after
+    the solve via n.model.constraints[name].dual (a DataArray).
+    """
+    try:
+        model = network.model
+        if cname not in model.constraints:
+            return 0.0
+        dual = model.constraints[cname].dual
+        # dual is a DataArray; for a scalar constraint squeeze to a float
+        val = float(dual.values.squeeze())
+        return val if not (val != val) else 0.0  # guard NaN
+    except Exception:
+        return 0.0
+
+
 def build_co2_shadow(network: pypsa.Network, carbon_price: float) -> dict[str, Any]:
     """Return CO₂ shadow price information from the solved network.
 
-    The shadow price (mu) is the dual variable of the CO₂ global constraint.
-    It represents the marginal cost of tightening the cap by 1 tonne —
-    i.e. what the implied carbon price is that makes the constraint binding.
+    Checks two sources in order:
+    1. PyPSA GlobalConstraints (workbook global_constraints sheet)
+    2. Custom linopy constraints added via the Constraints panel
+       (named cc_<i>_co2_cap by custom_constraints.py)
+
+    The shadow price is the dual variable of the binding CO₂ constraint.
+    For the intensity form (tCO₂/MWh): shadow price units are $/tCO₂.
 
     Returns a dict:
-        found           – bool, whether a CO₂ constraint exists and is bound
-        constraint_name – name of the CO₂ global constraint (if found)
-        shadow_price    – $/tCO₂  (dual variable value, positive = binding)
+        found           – bool, whether a CO₂ constraint was found
+        constraint_name – name of the constraint
+        shadow_price    – $/tCO₂ (absolute value of dual)
         explicit_price  – carbon price set in scenario ($/tCO₂)
-        cap_ktco2       – the constraint rhs in ktCO₂e (if applicable)
+        cap_value       – constraint RHS value (intensity or budget)
+        cap_unit        – unit string for cap_value
         status          – 'binding' | 'slack' | 'none'
         note            – human-readable explanation
     """
+    BINDING_THRESHOLD = 0.01
+
     result: dict[str, Any] = {
         "found": False,
         "constraint_name": None,
         "shadow_price": 0.0,
         "explicit_price": round(float(carbon_price), 2),
-        "cap_ktco2": None,
+        "cap_value": None,
+        "cap_unit": "tCO₂/MWh",
         "status": "none",
-        "note": "No CO₂ global constraint defined in this model.",
+        "note": "No CO₂ constraint active in this run.",
     }
 
-    if network.global_constraints.empty:
+    # ── 1. PyPSA GlobalConstraints (workbook sheet) ───────────────────────────
+    if not network.global_constraints.empty:
+        gc = network.global_constraints
+        co2_gc = gc[
+            (gc.get("carrier_attribute", "") == "co2_emissions")
+            | gc.index.str.contains("co2", case=False)
+        ]
+        if not co2_gc.empty:
+            name = co2_gc.index[0]
+            result["found"] = True
+            result["constraint_name"] = name
+            result["cap_unit"] = "ktCO₂e"
+
+            if "constant" in gc.columns:
+                result["cap_value"] = round(float(gc.at[name, "constant"]) / 1000.0, 1)
+
+            mu = 0.0
+            if "mu" in gc.columns:
+                try:
+                    mu = float(gc.at[name, "mu"])
+                except (TypeError, ValueError):
+                    mu = 0.0
+
+            result["shadow_price"] = round(abs(mu), 4)
+            if abs(mu) > BINDING_THRESHOLD:
+                result["status"] = "binding"
+                result["note"] = (
+                    f"GlobalConstraint '{name}' is binding. "
+                    f"Shadow price = ${abs(mu):.4f}/tCO₂."
+                )
+            else:
+                result["status"] = "slack"
+                result["note"] = (
+                    f"GlobalConstraint '{name}' exists but is not binding — "
+                    f"emissions are below the cap."
+                )
+            return result
+
+    # ── 2. Custom linopy constraints (scenario constraints panel) ─────────────
+    # Named cc_<i>_co2_cap by apply_custom_constraints()
+    try:
+        model_cnames = list(network.model.constraints)
+    except Exception:
+        model_cnames = []
+
+    co2_cnames = [n for n in model_cnames if "co2_cap" in n]
+
+    if not co2_cnames:
         return result
 
-    # Find constraints related to CO₂ (primary_energy type with co2_emissions attribute)
-    co2_constraints = network.global_constraints[
-        (network.global_constraints.get("carrier_attribute", "") == "co2_emissions")
-        | (network.global_constraints.index.str.contains("co2", case=False))
-    ]
+    name = co2_cnames[0]
+    mu = _linopy_dual(network, name)
 
-    if co2_constraints.empty:
-        return result
-
-    # Use the first CO₂ constraint found
-    name = co2_constraints.index[0]
     result["found"] = True
     result["constraint_name"] = name
+    result["cap_unit"] = "tCO₂/MWh"
+    result["shadow_price"] = round(abs(mu), 4)
 
-    constant = float(co2_constraints.at[name, "constant"]) if "constant" in co2_constraints.columns else None
-    if constant is not None:
-        result["cap_ktco2"] = round(constant / 1000.0, 1)  # tonnes → ktCO₂e
-
-    # Extract shadow price (dual variable / mu)
-    mu = 0.0
-    if hasattr(network, "global_constraints") and "mu" in network.global_constraints.columns:
-        raw_mu = network.global_constraints.at[name, "mu"]
-        if raw_mu is not None:
-            try:
-                mu = float(raw_mu)
-            except (TypeError, ValueError):
-                mu = 0.0
-
-    result["shadow_price"] = round(abs(mu), 2)
-
-    # Determine status
-    BINDING_THRESHOLD = 0.01  # $/tCO₂ — below this treat as non-binding
     if abs(mu) > BINDING_THRESHOLD:
         result["status"] = "binding"
         result["note"] = (
-            f"CO₂ constraint '{name}' is binding. "
-            f"Shadow price = ${abs(mu):.2f}/tCO₂ — the system would save "
-            f"${abs(mu):.2f} per tonne of additional emission headroom."
+            f"CO₂ intensity constraint is binding. "
+            f"Shadow price = ${abs(mu):.4f}/tCO₂ — relaxing the intensity cap "
+            f"by 1 tCO₂/MWh would reduce system cost by ${abs(mu):.4f} per MWh dispatched."
         )
     else:
         result["status"] = "slack"
         result["note"] = (
-            f"CO₂ constraint '{name}' exists but is not binding — "
-            f"actual emissions are below the cap. Shadow price ≈ $0."
+            f"CO₂ intensity constraint exists but is not binding — "
+            f"actual intensity is below the cap. Shadow price ≈ $0."
         )
 
     return result
