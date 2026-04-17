@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { GridRow } from '../../shared/types';
-import { numberValue, stringValue } from '../../shared/utils/helpers';
+import { stringValue } from '../../shared/utils/helpers';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +138,7 @@ function Donut({ data }: { data: { label: string; value: number; color: string }
 function Scatter({ xVals, yVals, labels, xCol, yCol }: {
   xVals: number[]; yVals: number[]; labels: string[]; xCol: string; yCol: string;
 }) {
+  const [hov, setHov] = useState<number | null>(null);
   if (!xVals.length) return <NoData />;
   const W = 440; const H = 260; const pL = 48; const pR = 16; const pT = 12; const pB = 36;
   const cW = W - pL - pR; const cH = H - pT - pB;
@@ -145,7 +146,6 @@ function Scatter({ xVals, yVals, labels, xCol, yCol }: {
   const yMin = Math.min(...yVals); const yMax = Math.max(...yVals) || 1;
   const xPos = (v: number) => pL + ((v - xMin) / (xMax - xMin || 1)) * cW;
   const yPos = (v: number) => pT + cH - ((v - yMin) / (yMax - yMin || 1)) * cH;
-  const [hov, setHov] = useState<number | null>(null);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
       {[0, 0.5, 1].map((t) => {
@@ -427,6 +427,48 @@ export function InputAnalyser({ rows, cols, isTs, frozenCol }: InputAnalyserProp
   const [tsSeries,  setTsSeries]  = useState('__all__');
   const [tsChart,   setTsChart]   = useState<TsChart>('line');
 
+  // ── Static derived values (hooks must be unconditional) ───────────────────
+  const nameCol     = frozenCol ?? cols[0] ?? '';
+  const activeValue = numericCols.includes(valueCol) ? valueCol : (numericCols[0] ?? '');
+  const activeScatY = numericCols.includes(scatterY) ? scatterY : (numericCols[1] ?? numericCols[0] ?? '');
+  const activeGroup = stringCols.includes(groupCol) ? groupCol : 'none';
+
+  const aggregate = (vals: number[], method: AggMethod): number => {
+    if (!vals.length) return 0;
+    if (method === 'sum')   return vals.reduce((a, b) => a + b, 0);
+    if (method === 'mean')  return vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (method === 'max')   return Math.max(...vals);
+    if (method === 'min')   return Math.min(...vals);
+    if (method === 'count') return vals.length;
+    return 0;
+  };
+
+  const groupedData = useMemo(() => {
+    if (!activeValue) return [];
+    if (activeGroup === 'none') {
+      return rows.map((r, i) => ({
+        label: nameCol ? stringValue(r[nameCol]) || `Row ${i + 1}` : `Row ${i + 1}`,
+        value: numVal(r[activeValue]),
+        group: '',
+      }));
+    }
+    const map = new Map<string, number[]>();
+    rows.forEach((r) => {
+      const g = stringValue(r[activeGroup]) || '(blank)';
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(numVal(r[activeValue]));
+    });
+    return Array.from(map.entries())
+      .map(([label, vals]) => ({ label, value: aggregate(vals, agg), group: label }))
+      .sort((a, b) => b.value - a.value);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, activeValue, activeGroup, agg, nameCol]);
+
+  const colorByGroup = useMemo(() => {
+    const groups = Array.from(new Set(groupedData.map((d) => d.group)));
+    return Object.fromEntries(groups.map((g, i) => [g, PALETTE[i % PALETTE.length]]));
+  }, [groupedData]);
+
   if (!rows.length) return <div className="ia-empty">No data — add rows to see charts.</div>;
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -483,48 +525,6 @@ export function InputAnalyser({ rows, cols, isTs, frozenCol }: InputAnalyserProp
 
   if (!numericCols.length) return <div className="ia-empty">No numeric columns to analyse.</div>;
 
-  const activeValue  = numericCols.includes(valueCol) ? valueCol : numericCols[0];
-  const activeScatY  = numericCols.includes(scatterY) ? scatterY : (numericCols[1] ?? numericCols[0]);
-  const activeGroup  = stringCols.includes(groupCol) ? groupCol : 'none';
-
-  const nameCol = frozenCol ?? cols[0] ?? '';
-
-  // Aggregate rows by group
-  const aggregate = (vals: number[], method: AggMethod): number => {
-    if (!vals.length) return 0;
-    if (method === 'sum')   return vals.reduce((a, b) => a + b, 0);
-    if (method === 'mean')  return vals.reduce((a, b) => a + b, 0) / vals.length;
-    if (method === 'max')   return Math.max(...vals);
-    if (method === 'min')   return Math.min(...vals);
-    if (method === 'count') return vals.length;
-    return 0;
-  };
-
-  const groupedData = useMemo(() => {
-    if (activeGroup === 'none') {
-      return rows.map((r, i) => ({
-        label: nameCol ? stringValue(r[nameCol]) || `Row ${i + 1}` : `Row ${i + 1}`,
-        value: numVal(r[activeValue]),
-        group: '',
-      }));
-    }
-    const map = new Map<string, number[]>();
-    rows.forEach((r) => {
-      const g = stringValue(r[activeGroup]) || '(blank)';
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(numVal(r[activeValue]));
-    });
-    return Array.from(map.entries())
-      .map(([label, vals]) => ({ label, value: aggregate(vals, agg), group: label }))
-      .sort((a, b) => b.value - a.value);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, activeValue, activeGroup, agg, nameCol]);
-
-  const colorByGroup = useMemo(() => {
-    const groups = Array.from(new Set(groupedData.map((d) => d.group)));
-    return Object.fromEntries(groups.map((g, i) => [g, PALETTE[i % PALETTE.length]]));
-  }, [groupedData]);
-
   const labels = groupedData.map((d) => d.label);
   const values = groupedData.map((d) => d.value);
   const colors = groupedData.map((d) => colorByGroup[d.group] ?? PALETTE[0]);
@@ -544,10 +544,9 @@ export function InputAnalyser({ rows, cols, isTs, frozenCol }: InputAnalyserProp
   const scatterYVals = rows.map((r) => numVal(r[activeScatY]));
   const scatterLabels = rows.map((r, i) => nameCol ? stringValue(r[nameCol]) || `Row ${i+1}` : `Row ${i+1}`);
 
-  const showGroupCtl  = staticChart !== 'scatter';
-  const showAggCtl    = showGroupCtl && activeGroup !== 'none';
-  const showScatterY  = staticChart === 'scatter';
-  const showDonutOnly = staticChart === 'donut' || staticChart === 'grouped-bar';
+  const showGroupCtl = staticChart !== 'scatter';
+  const showAggCtl   = showGroupCtl && activeGroup !== 'none';
+  const showScatterY = staticChart === 'scatter';
 
   return (
     <div className="ia-panel">
