@@ -11,7 +11,6 @@ from ..utils.workbook import workbook_rows
 def add_lines(
     network: pypsa.Network,
     model: dict[str, list[dict[str, Any]]],
-    transmission_multiplier: float,
 ) -> None:
     for row in workbook_rows(model, "lines"):
         name = text(row.get("name"))
@@ -27,7 +26,7 @@ def add_lines(
             x=number(row.get("x"), 0.1),
             r=number(row.get("r"), 0.01),
             b=number(row.get("b"), 0.0),
-            s_nom=number(row.get("s_nom"), 100.0) * transmission_multiplier,
+            s_nom=number(row.get("s_nom"), 100.0),
             length=number(row.get("length"), 1.0),
             num_parallel=max(1, int(number(row.get("num_parallel"), 1.0))),
             s_max_pu=number(row.get("s_max_pu"), 1.0),
@@ -64,7 +63,6 @@ def add_links(
 def add_transformers(
     network: pypsa.Network,
     model: dict[str, list[dict[str, Any]]],
-    transmission_multiplier: float,
 ) -> None:
     for row in workbook_rows(model, "transformers"):
         name = text(row.get("name"))
@@ -81,7 +79,7 @@ def add_transformers(
             r=number(row.get("r"), 0.002),
             g=number(row.get("g"), 0.0),
             b=number(row.get("b"), 0.05),
-            s_nom=number(row.get("s_nom"), 100.0) * transmission_multiplier,
+            s_nom=number(row.get("s_nom"), 100.0),
             tap_ratio=number(row.get("tap_ratio"), 1.0),
             tap_side=int(number(row.get("tap_side"), 0.0)),
             phase_shift=number(row.get("phase_shift"), 0.0),

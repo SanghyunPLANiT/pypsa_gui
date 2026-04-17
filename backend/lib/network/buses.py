@@ -73,13 +73,11 @@ def add_loads(
     network: pypsa.Network,
     model: dict[str, list[dict[str, Any]]],
     snapshots: pd.Index,
-    demand_growth_pct: float,
     step: int = 1,
 ) -> dict[str, float]:
     """Add loads using workbook data only.
     If 'loads-p_set' sheet is present its time-series takes priority;
     otherwise the static p_set is used as a flat constant."""
-    growth = 1.0 + demand_growth_pct / 100.0
     ts_p_set = parse_ts_sheet(model, "loads-p_set", snapshots, step=step)
     load_totals: dict[str, float] = defaultdict(float)
 
@@ -97,9 +95,8 @@ def add_loads(
             q_set=number(row.get("q_set")),
         )
         if ts_p_set and name in ts_p_set:
-            network.loads_t.p_set.loc[:, name] = ts_p_set[name] * growth
+            network.loads_t.p_set.loc[:, name] = ts_p_set[name]
         else:
-            # No time-series available → flat constant
-            network.loads_t.p_set.loc[:, name] = p_set_static * growth
+            network.loads_t.p_set.loc[:, name] = p_set_static
         load_totals[bus] += p_set_static
     return dict(load_totals)

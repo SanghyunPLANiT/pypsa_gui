@@ -152,6 +152,29 @@ export interface BranchDetail {
   lossesSeries: Array<{ label: string; timestamp: string; losses: number }>;
 }
 
+// ── Emissions breakdown types ─────────────────────────────────────────────────
+
+export interface GeneratorEmission {
+  name: string;
+  carrier: string;
+  bus: string;
+  energy_mwh: number;
+  emissions_tco2: number;
+  intensity_kg_mwh: number;  // kg CO₂e/MWh
+}
+
+export interface CarrierEmission {
+  carrier: string;
+  energy_mwh: number;
+  emissions_tco2: number;
+  intensity_kg_mwh: number;  // kg CO₂e/MWh
+}
+
+export interface EmissionsBreakdown {
+  byGenerator: GeneratorEmission[];
+  byCarrier: CarrierEmission[];
+}
+
 // ── Market analysis types ─────────────────────────────────────────────────────
 
 export interface MeritOrderEntry {
@@ -202,6 +225,7 @@ export interface RunResults {
   expansionResults?: ExpansionAsset[];
   meritOrder?: MeritOrderEntry[];
   co2Shadow?: Co2Shadow;
+  emissionsBreakdown?: EmissionsBreakdown;
   narrative: string[];
   runMeta: {
     snapshotCount: number;

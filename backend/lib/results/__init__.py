@@ -26,6 +26,7 @@ from .dispatch import (
     build_storage_series,
     dispatch_by_carrier,
 )
+from .emissions import build_emissions_breakdown
 from .expansion import build_expansion_results
 from .market import build_co2_shadow, build_merit_order
 
@@ -40,38 +41,9 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         else {}
     )
 
-    re_target = float(scenario.get("renewableTarget", 0.0))
     custom_constraints: list[dict] = scenario.get("constraints") or []
 
     def extra_functionality(n, snapshots):
-        # 1. Scenario-level RE target (params slider)
-        if re_target > 0:
-            try:
-                re_carriers = {"Solar", "Wind", "Hydro"}
-                re_gens = n.generators.index[n.generators.carrier.isin(re_carriers)].tolist()
-                supply_gens = [
-                    g for g in n.generators.index
-                    if not g.startswith("load_shedding_") and g != "grid_imports"
-                ]
-                if not re_gens or not supply_gens:
-                    notes.append(
-                        f"RE target {re_target:.0f}% requested but no renewable generators found — "
-                        "share constraint skipped."
-                    )
-                else:
-                    weights = n.snapshot_weightings["generators"]
-                    gen_p = n.model["Generator-p"]
-                    dim = [d for d in gen_p.dims if d != "snapshot"][0]
-                    re_total = (gen_p.sel({dim: re_gens}) * weights).sum()
-                    all_total = (gen_p.sel({dim: supply_gens}) * weights).sum()
-                    n.model.add_constraints(
-                        re_total >= (re_target / 100.0) * all_total, name="scenario_re_target"
-                    )
-                    notes.append(f"Scenario RE target: RE ≥ {re_target:.0f}% of total dispatch.")
-            except Exception as exc:
-                notes.append(f"Could not add RE target constraint: {exc}")
-
-        # 2. Custom constraints panel
         apply_custom_constraints(n, custom_constraints, emissions_factors, notes)
 
     try:
@@ -105,7 +77,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     )
     renewable_share = (renewable_capacity / total_capacity * 100.0) if total_capacity else 0.0
     total_load = float(load_dispatch.max())
-    reserve_requirement = total_load * (1.0 + float(scenario.get("reserveMargin", 0.0)) / 100.0)
+    reserve_requirement = total_load  # installed capacity vs peak demand
 
     emission_totals: dict[str, float] = defaultdict(float)
     carrier_energy: dict[str, float] = defaultdict(float)
@@ -147,6 +119,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     # Market analysis — merit order + CO₂ shadow price (pure post-processing)
     merit_order = build_merit_order(network)
     co2_shadow = build_co2_shadow(network, float(scenario.get("carbonPrice", 0.0)))
+    emissions_breakdown = build_emissions_breakdown(network, emissions_factors)
 
     cost_breakdown = [
         {"label": "Fuel cost", "value": round(fuel_cost)},
@@ -196,8 +169,8 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
 
     summary = [
         {"label": "Installed capacity", "value": f"{round(total_capacity):,} MW", "detail": f"{round(renewable_share)}% renewable capacity share"},
-        {"label": "Peak demand", "value": f"{round(total_load):,} MW", "detail": f"{float(scenario.get('demandGrowth', 0.0)):.1f}% growth vs workbook load"},
-        {"label": "Reserve position", "value": f"{round(total_capacity - reserve_requirement):,} MW", "detail": f"Reserve margin target {float(scenario.get('reserveMargin', 0.0)):.0f}%"},
+        {"label": "Peak demand", "value": f"{round(total_load):,} MW", "detail": "from workbook load profile"},
+        {"label": "Reserve position", "value": f"{round(total_capacity - reserve_requirement):,} MW", "detail": "installed capacity vs peak demand"},
         {"label": "Peak price", "value": f"{round(float(price_series.max())):,} $/MWh", "detail": f"{peak_net_load:,} MW peak net load"},
         {"label": "System emissions", "value": f"{round(total_emissions):,} ktCO2e", "detail": f"Carbon price {float(scenario.get('carbonPrice', 0.0)):.0f} $/t"},
         {"label": "Transmission stress", "value": f"{round(np.mean([x['value'] for x in line_loading]) if line_loading else 0):,}%", "detail": f"{sum(1 for x in line_loading if x['value'] > 80.0)} corridors above 80%"},
@@ -224,6 +197,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         "expansionResults": expansion_results,
         "meritOrder": merit_order,
         "co2Shadow": co2_shadow,
+        "emissionsBreakdown": emissions_breakdown,
         "narrative": notes,
         "runMeta": {
             "snapshotCount": snapshot_count,
