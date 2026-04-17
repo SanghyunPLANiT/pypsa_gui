@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { GridRow, Primitive, SheetName, TableSel, WorkbookModel } from '../../types';
 import { TABLE_GROUPS } from '../../constants';
+import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes';
 import { getColumns, stringValue } from '../../utils/helpers';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -107,6 +108,83 @@ function FilterDropdown({
       <div className="cfd-footer">
         <button className="cfd-btn" onClick={() => { onClear(); onClose(); }}>Clear</button>
         <button className="cfd-btn cfd-btn--primary" onClick={onClose}>OK</button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ── AddColumnDropdown ─────────────────────────────────────────────────────────
+
+interface AddColumnDropdownProps {
+  sheet: SheetName;
+  existingCols: string[];
+  anchorRect: DOMRect;
+  onAdd: (attr: AttrDef) => void;
+  onClose: () => void;
+}
+
+function AddColumnDropdown({ sheet, existingCols, anchorRect, onAdd, onClose }: AddColumnDropdownProps) {
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const allAttrs: AttrDef[] = PYPSA_OPTIONAL_ATTRS[sheet] ?? [];
+  const available = allAttrs.filter(
+    (a) =>
+      !existingCols.includes(a.col) &&
+      (!search || a.col.toLowerCase().includes(search.toLowerCase()) || a.label.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const top = Math.min(anchorRect.bottom + 4, window.innerHeight - 420);
+  const left = Math.min(anchorRect.left, window.innerWidth - 300);
+
+  return ReactDOM.createPortal(
+    <div
+      ref={ref}
+      className="add-col-dropdown"
+      style={{ top, left }}
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    >
+      <div className="add-col-header">Add column to <strong>{sheet}</strong></div>
+      <div className="cfd-search-wrap">
+        <input
+          className="cfd-search"
+          autoFocus
+          placeholder="Search attributes…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="add-col-list">
+        {available.length === 0 && (
+          <div className="cfd-empty">
+            {allAttrs.length === 0
+              ? 'No optional attributes defined for this sheet.'
+              : 'All known attributes are already present.'}
+          </div>
+        )}
+        {available.map((attr) => (
+          <button
+            key={attr.col}
+            className="add-col-item"
+            onClick={() => { onAdd(attr); onClose(); }}
+          >
+            <div className="add-col-item-top">
+              <span className="add-col-name">{attr.col}</span>
+              {attr.unit && <span className="add-col-unit">{attr.unit}</span>}
+              <span className={`add-col-type add-col-type--${attr.type}`}>{attr.type}</span>
+            </div>
+            <div className="add-col-desc">{attr.desc}</div>
+          </button>
+        ))}
       </div>
     </div>,
     document.body,
@@ -309,12 +387,16 @@ interface TablesPaneProps {
   onUpdate: (sheet: SheetName, rowIndex: number, col: string, val: Primitive) => void;
   onAddRow: (sheet: SheetName) => void;
   onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
+  onAddColumn: (sheet: SheetName, col: string, defaultValue: string | number | boolean) => void;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [navSearch, setNavSearch] = useState('');
+  const [addColOpen, setAddColOpen] = useState(false);
+  const [addColAnchor, setAddColAnchor] = useState<DOMRect | null>(null);
+  const addColBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const toggleGroup = (sheet: string) =>
     setCollapsed((s) => {
@@ -390,7 +472,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPan
                 <div className="nav-items">
                   <button
                     className={`nav-item${staticActive ? ' active' : ''}`}
-                    onClick={() => setSel({ kind: 'static', sheet: g.sheet })}
+                    onClick={() => { setSel({ kind: 'static', sheet: g.sheet }); setAddColOpen(false); }}
                   >
                     <span className="nav-item-icon">≡</span>
                     <span className="nav-item-label">static</span>
@@ -444,7 +526,28 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow }: TablesPan
                 − Last row
               </button>
             )}
+            <button
+              ref={addColBtnRef}
+              className="ghost-button sm"
+              onClick={() => {
+                if (addColOpen) { setAddColOpen(false); return; }
+                const rect = addColBtnRef.current?.getBoundingClientRect();
+                if (rect) setAddColAnchor(rect);
+                setAddColOpen(true);
+              }}
+            >
+              + Column
+            </button>
           </div>
+        )}
+        {addColOpen && addColAnchor && (
+          <AddColumnDropdown
+            sheet={sel.sheet as SheetName}
+            existingCols={cols}
+            anchorRect={addColAnchor}
+            onAdd={(attr) => onAddColumn(sel.sheet as SheetName, attr.col, attr.default)}
+            onClose={() => setAddColOpen(false)}
+          />
         )}
 
         <div className="tables-grid-wrap">
