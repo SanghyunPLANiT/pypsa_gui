@@ -2772,3 +2772,42 @@ th:hover .col-filter-btn { opacity: 1; }
   background: #e2e8f0;
   color: var(--text);
 }
+
+/* ── Analytics pane sub-tabs ─────────────────────────────────────────────── */
+.analytics-pane-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 0;
+  border-bottom: none;
+  flex-wrap: wrap;
+}
+.analytics-subtab-nav {
+  display: flex;
+  gap: 2px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+}
+.analytics-subtab {
+  padding: 6px 20px;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.analytics-subtab:hover {
+  background: #e2e8f0;
+  color: var(--text);
+}
+.analytics-subtab--active {
+  background: #fff;
+  color: #2563eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
@@ -100,12 +100,25 @@ export function AnalyticsPane({
     : analyticsFocus.type === 'branch' ? results.assetDetails.branches[analyticsFocus.key]?.summary || []
     : results.summary;
 
+  const [subTab, setSubTab] = useState<'results' | 'analytics'>('results');
+
   return (
     <div className="pane analytics-pane">
-      <div className="pane-header">
-        <div>
-          <p className="eyebrow">Analysis</p>
-          <h2>Interactive analytics dashboard</h2>
+      {/* Pane header with sub-tab nav */}
+      <div className="pane-header analytics-pane-header">
+        <div className="analytics-subtab-nav">
+          <button
+            className={`analytics-subtab${subTab === 'results' ? ' analytics-subtab--active' : ''}`}
+            onClick={() => setSubTab('results')}
+          >
+            Results
+          </button>
+          <button
+            className={`analytics-subtab${subTab === 'analytics' ? ' analytics-subtab--active' : ''}`}
+            onClick={() => setSubTab('analytics')}
+          >
+            Analytics
+          </button>
         </div>
         <div className="inline-stats">
           <span>{filename}</span>
@@ -114,15 +127,20 @@ export function AnalyticsPane({
         </div>
       </div>
 
-      {/* Results dashboard */}
-      <ResultsDashboard
-        results={results}
-        dispatchRows={dispatchRows}
-        dispatchSeries={dispatchSeries}
-        systemLoadRows={systemLoadRows}
-        systemPriceRows={systemPriceRows}
-        storageRows={storageRows}
-      />
+      {/* ── Results tab — predefined charts ───────────────────────────── */}
+      {subTab === 'results' && (
+        <ResultsDashboard
+          results={results}
+          dispatchRows={dispatchRows}
+          dispatchSeries={dispatchSeries}
+          systemLoadRows={systemLoadRows}
+          systemPriceRows={systemPriceRows}
+          storageRows={storageRows}
+        />
+      )}
+
+      {/* ── Analytics tab — map + user-defined charts ─────────────────── */}
+      {subTab === 'analytics' && <>
 
       {/* Map section */}
       <section className="chart-card analytics-map-card">
@@ -287,6 +305,8 @@ export function AnalyticsPane({
           </ul>
         </div>
       </section>
+
+      </>}
     </div>
   );
 }
