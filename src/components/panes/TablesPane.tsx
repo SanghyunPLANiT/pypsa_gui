@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { GridRow, Primitive, SheetName, TableSel, WorkbookModel } from '../../types';
 import { TABLE_GROUPS } from '../../constants';
 import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes';
-import { getColumns, stringValue } from '../../utils/helpers';
+import { getColumns, getTsFirstCol, stringValue } from '../../utils/helpers';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -196,11 +196,12 @@ function AddColumnDropdown({ sheet, existingCols, anchorRect, onAdd, onClose }: 
 interface SpreadsheetGridProps {
   rows: GridRow[];
   cols: string[];
+  frozenCol?: string | null;
   readOnly?: boolean;
   onUpdate?: (rowIndex: number, col: string, val: Primitive) => void;
 }
 
-function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: SpreadsheetGridProps) {
+function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate }: SpreadsheetGridProps) {
   const [editCell, setEditCell] = useState<{ row: number; col: string; val: string } | null>(null);
   // col → Set of values TO SHOW. Missing key = show all.
   const [colFilters, setColFilters] = useState<Record<string, Set<string>>>({});
@@ -288,11 +289,16 @@ function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: Spreadsheet
             <th className="rn-col">#</th>
             {cols.map((c) => {
               const active = isActive(c);
+              const frozen = c === frozenCol;
+              const cls = [
+                frozen ? 'col-frozen' : '',
+                active ? 'col-filtered' : '',
+              ].filter(Boolean).join(' ') || undefined;
               return (
                 <th
                   key={c}
                   title={c}
-                  className={active ? 'col-filtered' : undefined}
+                  className={cls}
                   ref={(el) => { thRefs.current[c] = el; }}
                 >
                   <div className="col-header-inner">
@@ -321,10 +327,12 @@ function SpreadsheetGrid({ rows, cols, readOnly = false, onUpdate }: Spreadsheet
                 <td className="rn-col">{origIdx + 1}</td>
                 {cols.map((c) => {
                   const isEditing = !readOnly && editCell?.row === origIdx && editCell?.col === c;
+                  const frozen = c === frozenCol;
+                  const baseClass = isEditing ? 'cell-editing' : readOnly ? 'cell-readonly' : 'cell-editable';
                   return (
                     <td
                       key={c}
-                      className={isEditing ? 'cell-editing' : readOnly ? 'cell-readonly' : 'cell-editable'}
+                      className={frozen ? `${baseClass} col-frozen` : baseClass}
                       onDoubleClick={() => {
                         if (!readOnly) setEditCell({ row: origIdx, col: c, val: stringValue(row[c]) });
                       }}
@@ -409,7 +417,9 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
   const rows: GridRow[] = isTs
     ? ((model as any)[sel.sheet] as GridRow[]) ?? []
     : (model as any)[sel.sheet] ?? [];
-  const cols: string[] =
+
+  // Build ordered column list with pinned first column
+  const rawCols: string[] =
     rows.length > 0
       ? isTs
         ? Object.keys(rows[0])
@@ -417,6 +427,19 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
       : isTs
         ? []
         : getColumns([], sel.sheet as SheetName);
+
+  // For temporal sheets, ensure snapshot/timestamp is first
+  let cols = rawCols;
+  if (isTs && rawCols.length > 0) {
+    const tsFirst = getTsFirstCol(rows);
+    const idx = rawCols.indexOf(tsFirst);
+    if (idx > 0) {
+      cols = [tsFirst, ...rawCols.filter((c) => c !== tsFirst)];
+    }
+  }
+
+  // The first data column is always frozen (sticky)
+  const frozenCol = cols[0] ?? null;
 
   const parentGroup = isTs
     ? TABLE_GROUPS.find((g) => g.tsSheet === sel.sheet)
@@ -559,6 +582,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
             <SpreadsheetGrid
               rows={rows}
               cols={cols}
+              frozenCol={frozenCol}
               readOnly={isTs}
               onUpdate={
                 isTs ? undefined : (ri, col, val) => onUpdate(sel.sheet as SheetName, ri, col, val)
