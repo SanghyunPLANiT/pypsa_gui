@@ -80,3 +80,34 @@ export function exportWorkbook(model: WorkbookModel, filename = 'ragnarok_case.x
 export function workbookToArrayBuffer(model: WorkbookModel): ArrayBuffer {
   return XLSX.write(buildWorkbook(model), { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
 }
+
+/**
+ * Parse a CSV (or TSV) file into GridRow[] for use as a time-series sheet.
+ *
+ * Expected shape:
+ *   Column 0  — snapshot label (string, e.g. "2019-01-01 00:00")
+ *   Columns 1+ — component names → numeric values
+ *
+ * SheetJS auto-detects comma vs tab delimiter.  BOM-prefixed files are handled
+ * transparently.  All numeric cells are cast to `number`; the label column is
+ * kept as `string`.  Unparseable numeric cells become `null`.
+ */
+export async function parseCsvToGridRows(file: File): Promise<GridRow[]> {
+  const text = await file.text();
+  const wb = XLSX.read(text, { type: 'string', raw: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+
+  return raw.map((row) => {
+    const entries = Object.entries(row).map(([k, v], i): [string, Primitive] => {
+      if (i === 0) {
+        // Snapshot label — keep as string
+        return [k, v == null ? '' : String(v)];
+      }
+      // Numeric value column
+      const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+      return [k, Number.isFinite(n) ? n : null];
+    });
+    return Object.fromEntries(entries) as GridRow;
+  });
+}
