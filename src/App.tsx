@@ -6,17 +6,19 @@ import {
   BrowserFileHandle,
   ChartSectionConfig,
   CustomConstraint,
+  GridRow,
   MetricOption,
   Primitive,
   RunResults,
   SheetName,
   TimeSeriesRow,
   TimeSeriesSeries,
+  TsSheetName,
   WorkbookModel,
   WorkspaceTab,
 } from './types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, EMPTY_METRIC_KEY } from './constants';
-import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer } from './utils/workbook';
+import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './utils/workbook';
 import { exportFullResults } from './utils/exportResults';
 import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './utils/analytics';
@@ -171,6 +173,17 @@ function AppInner() {
       return { ...current, [sheet]: nextRows };
     });
     setStatus(`Added column "${col}" to ${sheet}.`);
+  };
+
+  const handleImportTsSheet = (sheet: TsSheetName, rows: GridRow[]) => {
+    setModel((current) => ({ ...current, [sheet]: rows }));
+    if (rows.length > 0) {
+      showToast(`Imported ${rows.length} rows into ${sheet}`, 'success');
+      setStatus(`Imported ${rows.length} rows into ${sheet}.`);
+    } else {
+      showToast(`Cleared ${sheet}`, 'success');
+      setStatus(`Cleared ${sheet}.`);
+    }
   };
 
   const saveAsWorkbook = async () => {
@@ -467,6 +480,7 @@ function AppInner() {
                 onAddRow={addRow}
                 onDeleteRow={deleteRow}
                 onAddColumn={addColumn}
+                onImportTsSheet={handleImportTsSheet}
               />
             </div>
           )}

@@ -1623,6 +1623,15 @@ path.leaflet-interactive:focus {
   border-radius: 6px;
 }
 
+.ts-row-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 2px 8px;
+  background: var(--surface2);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 .section-toolbar {
   display: flex;
   gap: 8px;

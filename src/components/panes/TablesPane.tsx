@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { GridRow, Primitive, SheetName, TableSel, WorkbookModel } from '../../types';
+import { GridRow, Primitive, SheetName, TableSel, TsSheetName, WorkbookModel } from '../../types';
 import { TABLE_GROUPS } from '../../constants';
 import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes';
 import { getColumns, getTsFirstCol, stringValue } from '../../utils/helpers';
+import { parseCsvToGridRows } from '../../utils/workbook';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -396,15 +397,17 @@ interface TablesPaneProps {
   onAddRow: (sheet: SheetName) => void;
   onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
   onAddColumn: (sheet: SheetName, col: string, defaultValue: string | number | boolean) => void;
+  onImportTsSheet: (sheet: TsSheetName, rows: GridRow[]) => void;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [navSearch, setNavSearch] = useState('');
   const [addColOpen, setAddColOpen] = useState(false);
   const [addColAnchor, setAddColAnchor] = useState<DOMRect | null>(null);
   const addColBtnRef = useRef<HTMLButtonElement | null>(null);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   const toggleGroup = (sheet: string) =>
     setCollapsed((s) => {
@@ -412,6 +415,20 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
       n.has(sheet) ? n.delete(sheet) : n.add(sheet);
       return n;
     });
+
+  const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || sel.kind !== 'ts') return;
+    try {
+      const imported = await parseCsvToGridRows(file);
+      if (imported.length === 0) throw new Error('No rows found in the file.');
+      onImportTsSheet(sel.sheet as TsSheetName, imported);
+    } catch (err) {
+      window.alert(`CSV import failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   const isTs = sel.kind === 'ts';
   const rows: GridRow[] = isTs
@@ -532,11 +549,37 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
           <div className="inline-stats">
             <span>{rows.length} rows</span>
             {cols.length > 0 && <span>{cols.length} cols</span>}
-            {isTs && <span className="ts-chip">read-only · double-click to inspect</span>}
+            {isTs && <span className="ts-chip">time-series</span>}
           </div>
         </div>
 
-        {!isTs && (
+        {isTs ? (
+          <div className="section-toolbar">
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt"
+              hidden
+              onChange={handleCsvFile}
+            />
+            <button className="ghost-button sm" onClick={() => csvInputRef.current?.click()}>
+              📥 Import CSV
+            </button>
+            {rows.length > 0 && (
+              <span className="ts-row-count">{rows.length} rows loaded</span>
+            )}
+            {rows.length > 0 && (
+              <button
+                className="ghost-button sm danger"
+                title="Remove all rows from this time-series sheet"
+                onClick={() => onImportTsSheet(sel.sheet as TsSheetName, [])}
+              >
+                Clear
+              </button>
+            )}
+            <span className="ts-chip">first col = snapshot label · remaining cols = component names</span>
+          </div>
+        ) : (
           <div className="section-toolbar">
             <button className="ghost-button sm" onClick={() => onAddRow(sel.sheet as SheetName)}>
               + Row
@@ -576,7 +619,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
         <div className="tables-grid-wrap">
           {rows.length === 0 ? (
             <div className="grid-empty">
-              {isTs ? 'No temporal data in this sheet.' : 'No rows yet — use "+ Row" to add one.'}
+              {isTs ? 'No temporal data — use "Import CSV" above to load a profile.' : 'No rows yet — use "+ Row" to add one.'}
             </div>
           ) : (
             <SpreadsheetGrid
