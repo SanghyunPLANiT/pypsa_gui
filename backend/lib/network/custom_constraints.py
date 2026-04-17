@@ -44,7 +44,9 @@ def apply_custom_constraints(
         cname = f"cc_{i}_{metric}"
 
         try:
-            # ── CO₂ budget cap ───────────────────────────────────────────────
+            # ── CO₂ emission intensity cap (tCO₂/MWh) ───────────────────────
+            # Constraint: Σ(co2_factor_g × dispatch_g) ≤ value × Σ(dispatch_g)
+            # where the sum runs over all non-shedding generators.
             if metric == "co2_cap":
                 emitters = [
                     (g, emissions_factors.get(n.generators.at[g, "carrier"], 0.0))
@@ -54,12 +56,19 @@ def apply_custom_constraints(
                 if not emitters:
                     notes.append(f"Constraint '{label}': no CO₂-emitting generators found — skipped.")
                     continue
-                lhs = sum(
+                if not supply_gens:
+                    notes.append(f"Constraint '{label}': no supply generators found — skipped.")
+                    continue
+                total_emissions = sum(
                     co2 * (gen_p.sel({dim: [g]}) * weights).sum()
                     for g, co2 in emitters
                 )
-                n.model.add_constraints(lhs <= value * 1_000, name=cname)
-                notes.append(f"Constraint '{label}': CO₂ ≤ {value} ktCO₂e added.")
+                total_dispatch = (gen_p.sel({dim: supply_gens}) * weights).sum()
+                # total_emissions ≤ value × total_dispatch
+                n.model.add_constraints(
+                    total_emissions - value * total_dispatch <= 0, name=cname
+                )
+                notes.append(f"Constraint '{label}': CO₂ intensity ≤ {value} tCO₂/MWh added.")
 
             # ── Minimum renewable share ──────────────────────────────────────
             elif metric == "re_share":

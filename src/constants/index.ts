@@ -72,7 +72,7 @@ export const CARRIER_COLORS: Record<string, string> = {
 // ── Constraint definitions ────────────────────────────────────────────────────
 
 export const METRIC_DEFS: Record<ConstraintMetric, { label: string; description: string; unit: string; needsCarrier: boolean; sense: string }> = {
-  co2_cap:          { label: 'CO₂ Budget Cap',         description: 'Total system CO₂ ≤ value',                  unit: 'ktCO₂e', needsCarrier: false, sense: '≤' },
+  co2_cap:          { label: 'CO₂ Intensity Cap',       description: 'Avg emission intensity ≤ value (tCO₂/MWh)', unit: 'tCO₂/MWh', needsCarrier: false, sense: '≤' },
   re_share:         { label: 'Min Renewable Share',    description: 'Solar+Wind+Hydro share ≥ value',            unit: '%',      needsCarrier: false, sense: '≥' },
   max_load_shed:    { label: 'Max Load Shedding',      description: 'Total unserved energy ≤ value',             unit: 'MWh',    needsCarrier: false, sense: '≤' },
   carrier_max_gen:  { label: 'Max Carrier Generation', description: 'Total output of carrier ≤ value',           unit: 'GWh',    needsCarrier: true,  sense: '≤' },
@@ -81,16 +81,7 @@ export const METRIC_DEFS: Record<ConstraintMetric, { label: string; description:
   carrier_min_share:{ label: 'Min Carrier Share',      description: 'Carrier dispatch / total dispatch ≥ value', unit: '%',      needsCarrier: true,  sense: '≥' },
 };
 
-export const DEFAULT_CONSTRAINTS: CustomConstraint[] = [
-  { id: 'p_co2',      enabled: false, label: 'CO₂ Budget Cap',         metric: 'co2_cap',          carrier: '',        value: 50,  unit: 'ktCO₂e' },
-  { id: 'p_re',       enabled: false, label: 'Min Renewable Share',    metric: 're_share',          carrier: '',        value: 30,  unit: '%' },
-  { id: 'p_shed',     enabled: false, label: 'Max Load Shedding',      metric: 'max_load_shed',     carrier: '',        value: 100, unit: 'MWh' },
-  { id: 'p_coal_sh',  enabled: false, label: 'Max Coal Share',         metric: 'carrier_max_share', carrier: 'Coal',    value: 30,  unit: '%' },
-  { id: 'p_lng_sh',   enabled: false, label: 'Max LNG Share',          metric: 'carrier_max_share', carrier: 'LNG',     value: 50,  unit: '%' },
-  { id: 'p_nuc_min',  enabled: false, label: 'Min Nuclear Output',     metric: 'carrier_min_gen',   carrier: 'Nuclear', value: 10,  unit: 'GWh' },
-  { id: 'p_solar_min',enabled: false, label: 'Min Solar Output',       metric: 'carrier_min_gen',   carrier: 'Solar',   value: 0,   unit: 'GWh' },
-  { id: 'p_coal_max', enabled: false, label: 'Max Coal Generation',    metric: 'carrier_max_gen',   carrier: 'Coal',    value: 100, unit: 'GWh' },
-];
+export const DEFAULT_CONSTRAINTS: CustomConstraint[] = [];
 
 export const EMPTY_METRIC_KEY = '__empty__';
 
