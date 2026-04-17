@@ -2811,3 +2811,170 @@ th:hover .col-filter-btn { opacity: 1; }
   color: #2563eb;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
+
+/* ── Multi Year Panel (sidebar) ─────────────────────────────────────────────── */
+.my-panel { display: flex; flex-direction: column; gap: 0; }
+.my-step { border-top: 1px solid var(--border); padding: 10px 0 6px; }
+.my-step:first-child { border-top: none; }
+.my-step-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.my-step-num {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--fg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.my-step-title { font-size: 0.82rem; font-weight: 600; color: var(--fg); flex: 1; }
+.my-step-icon { font-size: 0.8rem; flex-shrink: 0; }
+.my-step-icon--ok { color: #16a34a; }
+.my-step-icon--warn { color: #d97706; }
+.my-step-icon--idle { color: var(--muted); }
+.my-step-body { padding-left: 24px; display: flex; flex-direction: column; gap: 6px; }
+
+.my-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.my-field-row label { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.my-input-unit { display: flex; align-items: center; gap: 4px; }
+.my-input {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 0.82rem;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+.my-input:focus { border-color: #3b82f6; }
+.my-input--sm { width: 60px; text-align: right; }
+.my-unit { font-size: 0.78rem; color: var(--muted); }
+.my-timeline {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.01em;
+  margin-top: 2px;
+}
+.my-detect-ok { display: flex; flex-direction: column; gap: 3px; }
+.my-detect-row {
+  font-size: 0.78rem;
+  color: #16a34a;
+}
+.my-detect-partial { color: #2563eb !important; }
+.my-hint { font-size: 0.78rem; color: var(--muted); line-height: 1.4; margin-bottom: 4px; }
+.my-preview { font-size: 0.75rem; color: var(--muted); font-style: italic; margin-top: 2px; }
+.my-run-btn { width: 100%; margin-top: 4px; }
+.my-run-summary { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.my-run-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.my-run-status--done { background: #dcfce7; color: #16a34a; }
+.my-run-status--error { background: #fee2e2; color: #dc2626; }
+.my-run-detail { font-size: 0.78rem; color: var(--muted); }
+
+/* ── Run Panel (sidebar) ─────────────────────────────────────────────────────── */
+.rp-panel { display: flex; flex-direction: column; gap: 10px; }
+.rp-mode-toggle {
+  display: flex;
+  gap: 3px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.rp-mode-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.rp-mode-btn:hover { background: #e2e8f0; color: var(--fg); }
+.rp-mode-btn--active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.rp-section { display: flex; flex-direction: column; gap: 8px; }
+.rp-static-notice {
+  font-size: 0.8rem;
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.rp-static-notice p { margin: 4px 0 0; color: var(--muted); font-size: 0.78rem; }
+.rp-field { display: flex; flex-direction: column; gap: 4px; }
+.rp-field-label { font-size: 0.78rem; color: var(--muted); }
+.rp-res-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.rp-dryrun-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--fg);
+  cursor: pointer;
+}
+.rp-run-btn { width: 100%; }
+.rp-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.rp-status--done { background: #dcfce7; color: #16a34a; }
+.rp-status--error { background: #fee2e2; color: #dc2626; }
+.rp-my-summary { display: flex; flex-direction: column; gap: 3px; }
+.rp-my-timeline { font-size: 0.78rem; font-family: 'IBM Plex Mono', monospace; color: var(--fg); }
+.rp-my-hint { font-size: 0.75rem; color: var(--muted); }
+
+/* ── Multi-Year Results Card ─────────────────────────────────────────────────── */
+.my-results-card { display: flex; flex-direction: column; gap: 0; }
+.my-kpi-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.my-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 80px;
+}
+.my-kpi-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.my-kpi-value { font-size: 1.1rem; font-weight: 700; color: var(--fg); }
+.my-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.my-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--fg); }
+.my-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.my-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.my-cost-table th, .my-cost-table td {
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.my-cost-table th:first-child, .my-cost-table td:first-child { text-align: left; }
+.my-cost-table th { color: var(--muted); font-weight: 600; font-size: 0.75rem; }
+.my-empty { font-size: 0.85rem; color: var(--muted); padding: 12px 0; }
+.my-narrative { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.my-narrative summary { cursor: pointer; }
+.my-narrative ul { margin: 4px 0 0 16px; padding: 0; line-height: 1.6; }

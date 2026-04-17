@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
-  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
+  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, MultiYearResults, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../types';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor, loadingColor } from '../../utils/helpers';
@@ -11,6 +11,7 @@ import { MapLegend } from '../map/MapLegend';
 import { SummaryCards } from '../common/SummaryCards';
 import { UserDefinedChartCard } from '../charts/UserDefinedChartCard';
 import { ResultsDashboard } from '../charts/ResultsDashboard';
+import { MultiYearResultsCard } from '../charts/MultiYearResultsCard';
 
 interface Props {
   results: RunResults;
@@ -28,6 +29,7 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
+  multiYearResults?: MultiYearResults | null;
 }
 
 function EmptyAnalytics() {
@@ -50,6 +52,7 @@ export function AnalyticsPane({
   metricOptions,
   dispatchRows, dispatchSeries,
   systemLoadRows, systemPriceRows, storageRows,
+  multiYearResults,
 }: Props) {
   const focusTitle =
     analyticsFocus.type === 'system' ? 'System analytics' : analyticsFocus.key;
@@ -129,14 +132,19 @@ export function AnalyticsPane({
 
       {/* ── Results tab — predefined charts ───────────────────────────── */}
       {subTab === 'results' && (
-        <ResultsDashboard
-          results={results}
-          dispatchRows={dispatchRows}
-          dispatchSeries={dispatchSeries}
-          systemLoadRows={systemLoadRows}
-          systemPriceRows={systemPriceRows}
-          storageRows={storageRows}
-        />
+        <>
+          {multiYearResults && (
+            <MultiYearResultsCard data={multiYearResults} />
+          )}
+          <ResultsDashboard
+            results={results}
+            dispatchRows={dispatchRows}
+            dispatchSeries={dispatchSeries}
+            systemLoadRows={systemLoadRows}
+            systemPriceRows={systemPriceRows}
+            storageRows={storageRows}
+          />
+        </>
       )}
 
       {/* ── Analytics tab — map + user-defined charts ─────────────────── */}
