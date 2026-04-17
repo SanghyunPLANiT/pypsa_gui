@@ -9,7 +9,6 @@ from .lib.config import load_system_defaults
 from .lib.models import RunPayload
 from .lib.network import validate_model
 from .lib.results import run_pypsa
-from .lib.results.multiyear import run_multiyear
 
 app = FastAPI(title="Ragnarok Backend", version="0.1.0")
 app.add_middleware(
@@ -44,8 +43,3 @@ def validate_case(payload: RunPayload) -> dict[str, Any]:
 @app.post("/api/run")
 def run_case(payload: RunPayload) -> dict[str, Any]:
     return run_pypsa(payload)
-
-
-@app.post("/api/run-multiyear")
-def run_multiyear_case(payload: RunPayload) -> dict[str, Any]:
-    return run_multiyear(payload)

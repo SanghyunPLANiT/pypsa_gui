@@ -6,10 +6,7 @@ import {
   BrowserFileHandle,
   ChartSectionConfig,
   CustomConstraint,
-  DemandForecastSettings,
-  MacroSettings,
   MetricOption,
-  MultiYearResults,
   Primitive,
   RunResults,
   SheetName,
@@ -23,9 +20,8 @@ import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook,
 import { exportFullResults } from './utils/exportResults';
 import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './utils/analytics';
+import { DualRangeSlider } from './components/common/DualRangeSlider';
 import { SidebarGroup } from './components/layout/SidebarGroup';
-import { MultiYearPanel, deriveInvestmentPeriods } from './components/sidebar/MultiYearPanel';
-import { RunPanel } from './components/sidebar/RunPanel';
 import { GlobalConstraintsSection } from './components/constraints/GlobalConstraintsSection';
 import { MapPane } from './components/panes/MapPane';
 import { TablesPane } from './components/panes/TablesPane';
@@ -48,26 +44,8 @@ function AppInner() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [dryRun, setDryRun] = useState(false);
-
-  // ── Multi-year investment state ───────────────────────────────────────────
-  const [runMode, setRunMode] = useState<'single' | 'multiyear'>('single');
-  const [macroSettings, setMacroSettings] = useState<MacroSettings>({
-    discountRate: 0.05,
-    carbonPrice: 0,
-    baseYear: new Date().getFullYear(),
-    periodCount: 3,
-    periodLength: 5,
-  });
-  const [demandForecast, setDemandForecast] = useState<DemandForecastSettings>({
-    annualGrowthPct: 2.0,
-    peakGrowthPct: null,
-    floorGrowthPct: null,
-    peakTouched: false,
-    floorTouched: false,
-  });
-  const [multiYearResults, setMultiYearResults] = useState<MultiYearResults | null>(null);
-  const [multiYearRunStatus, setMultiYearRunStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [validateResult, setValidateResult] = useState<{
     valid: boolean;
     errors: string[];
@@ -250,6 +228,8 @@ function AppInner() {
       options: { snapshotCount, snapshotStart, snapshotWeight },
     };
 
+    setRunDialogOpen(false);
+
     if (dryRun) {
       setStatus('Validating model structure...');
       try {
@@ -292,55 +272,6 @@ function AppInner() {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
       setRunStatus('error');
-      setStatus(msg);
-      showToast(msg, 'error');
-    }
-  };
-
-  const handleRunMultiYear = async () => {
-    const investmentPeriods = deriveInvestmentPeriods(macroSettings);
-    const payload = {
-      model,
-      scenario: {
-        constraints: constraints.filter((c) => c.enabled),
-        carbonPrice: macroSettings.carbonPrice,
-        discountRate: macroSettings.discountRate,
-        demandForecast: {
-          annualGrowthPct: demandForecast.annualGrowthPct,
-          peakGrowthPct: demandForecast.peakGrowthPct ?? demandForecast.annualGrowthPct,
-          floorGrowthPct: demandForecast.floorGrowthPct ?? demandForecast.annualGrowthPct,
-          baseYear: macroSettings.baseYear,
-        },
-      },
-      options: {
-        investmentPeriods,
-        periodLength: macroSettings.periodLength,
-        snapshotCount: snapshotEnd - snapshotStart,
-        snapshotStart,
-        snapshotWeight,
-      },
-    };
-    setMultiYearRunStatus('running');
-    setStatus(`Running multi-year — ${investmentPeriods.length} periods…`);
-    try {
-      const response = await fetch(`${API_BASE}/api/run-multiyear`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Multi-year run failed with status ${response.status}.`);
-      }
-      const data = (await response.json()) as MultiYearResults;
-      setMultiYearResults(data);
-      setMultiYearRunStatus('done');
-      const doneMsg = `Multi-year complete — ${investmentPeriods.length} periods, NPV $${data.totalNpvM.toFixed(0)}M.`;
-      setStatus(doneMsg);
-      showToast(doneMsg, 'success');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Multi-year run failed.';
-      setMultiYearRunStatus('error');
       setStatus(msg);
       showToast(msg, 'error');
     }
@@ -463,7 +394,7 @@ function AppInner() {
         <div className="topbar-left">
           <span className="topbar-brand">Ragnarok</span>
           <div className="topbar-divider" />
-          <button className="run-button" onClick={() => runMode === 'multiyear' ? handleRunMultiYear() : handleRunModel()}>▶ Run</button>
+          <button className="run-button" onClick={() => setRunDialogOpen(true)}>▶ Run</button>
           <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
           <div className="topbar-divider" />
           <div className="case-chip">
@@ -528,42 +459,6 @@ function AppInner() {
                 </div>
               </SidebarGroup>
 
-              <SidebarGroup title="Multi Year" icon="📅">
-                <MultiYearPanel
-                  model={model}
-                  macroSettings={macroSettings}
-                  onMacroChange={setMacroSettings}
-                  demandForecast={demandForecast}
-                  onDemandChange={setDemandForecast}
-                  multiYearRunStatus={multiYearRunStatus}
-                  multiYearResults={multiYearResults}
-                  onRunMultiYear={handleRunMultiYear}
-                />
-              </SidebarGroup>
-
-              <SidebarGroup title="Run" icon="▶" defaultOpen>
-                <RunPanel
-                  mode={runMode}
-                  onModeChange={setRunMode}
-                  snapshotStart={snapshotStart}
-                  snapshotEnd={snapshotEnd}
-                  snapshotWeight={snapshotWeight}
-                  maxSnapshots={maxSnapshots}
-                  dryRun={dryRun}
-                  carbonPrice={carbonPrice}
-                  onSnapshotStartChange={setSnapshotStart}
-                  onSnapshotEndChange={setSnapshotEnd}
-                  onSnapshotWeightChange={setSnapshotWeight}
-                  onDryRunChange={setDryRun}
-                  onCarbonPriceChange={setCarbonPrice}
-                  macroSettings={macroSettings}
-                  onRunSingle={handleRunModel}
-                  onRunMultiYear={handleRunMultiYear}
-                  singleRunStatus={runStatus}
-                  multiYearRunStatus={multiYearRunStatus}
-                />
-              </SidebarGroup>
-
               <SidebarGroup
                 title="Constraints" icon="⛓"
                 badge={constraints.filter((c) => c.enabled).length > 0
@@ -614,8 +509,8 @@ function AppInner() {
           {tab === 'Validation' && (
             <ValidationPane
               validateResult={validateResult}
-              onValidate={() => { setDryRun(true); handleRunModel(); }}
-              onRun={() => { setDryRun(false); handleRunModel(); }}
+              onValidate={() => { setDryRun(true); setRunDialogOpen(true); }}
+              onRun={() => { setDryRun(false); setRunDialogOpen(true); }}
             />
           )}
 
@@ -639,13 +534,115 @@ function AppInner() {
                 systemLoadRows={systemLoadRows}
                 systemPriceRows={systemPriceRows}
                 storageRows={storageRows}
-                multiYearResults={multiYearResults}
               />
             )
           )}
         </div>
       </div>
 
+      {/* ── Run dialog ── */}
+      {runDialogOpen && (
+        <div className="modal-backdrop" onClick={() => setRunDialogOpen(false)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="panel-title-row">
+              <div>
+                <p className="eyebrow">Run</p>
+                <h2>Run configuration</h2>
+              </div>
+            </div>
+            {maxSnapshots <= 1 ? (
+              <div className="run-static-notice">
+                <strong>Static single-period model</strong>
+                <p>The workbook defines 1 snapshot (<code>now</code>). This runs as a single dispatch period.</p>
+              </div>
+            ) : (
+              <>
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                    Simulation window — <strong>{snapshotEnd - snapshotStart} hourly steps</strong>
+                    {' '}(step {snapshotStart} → {snapshotEnd} of {maxSnapshots})
+                  </span>
+                  <DualRangeSlider
+                    min={0} max={maxSnapshots}
+                    low={snapshotStart} high={snapshotEnd}
+                    formatLabel={(v) => `${v}`}
+                    onChange={(lo, hi) => { setSnapshotStart(lo); setSnapshotEnd(hi); }}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  {(() => {
+                    const step = snapshotWeight;
+                    const windowSize = snapshotEnd - snapshotStart;
+                    const modeledSnapshots = Math.ceil(windowSize / step);
+                    return (
+                      <>
+                        <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
+                          Time resolution — <strong>every {step}h</strong>
+                          {' '}({modeledSnapshots} snapshots of {windowSize} hourly steps)
+                        </span>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                          {[1, 2, 3, 4, 6, 8, 12, 24].map((n) => (
+                            <button
+                              key={n}
+                              className={`tb-btn${snapshotWeight === n ? '' : ' tb-btn--muted'}`}
+                              style={{ minWidth: 40 }}
+                              onClick={() => setSnapshotWeight(n)}
+                            >
+                              {n}h
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <p className="status-text" style={{ marginBottom: 12 }}>
+                  Resolution selects every Nth step — <code>snapshots[::N]</code> with{' '}
+                  <code>snapshot_weightings = N</code>. Higher N = coarser resolution, faster solve.
+                </p>
+              </>
+            )}
+            <div className="run-carbon-row">
+              <label className="run-carbon-label" htmlFor="run-carbon-price">
+                <span>💨 Carbon price</span>
+                <span className="run-carbon-unit">$/tCO₂</span>
+              </label>
+              <input
+                id="run-carbon-price"
+                type="number"
+                className="run-carbon-input"
+                min={0}
+                max={1000}
+                step={1}
+                value={carbonPrice}
+                onChange={(e) => setCarbonPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+              />
+              {carbonPrice > 0 && (
+                <span className="run-carbon-hint">
+                  Added to each generator's marginal cost proportional to CO₂ emissions
+                </span>
+              )}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={dryRun}
+                onChange={(e) => setDryRun(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.9rem' }}>
+                <strong>Dry run</strong> — validate model structure without optimising
+              </span>
+            </label>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setRunDialogOpen(false)}>Cancel</button>
+              <button className="run-button" onClick={() => handleRunModel()}>
+                {dryRun ? 'Validate' : 'Run model'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
