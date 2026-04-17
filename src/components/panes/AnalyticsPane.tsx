@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
-  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
+  AnalyticsFocus, ChartSectionConfig, GridRow, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../types';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor, loadingColor } from '../../utils/helpers';
@@ -22,7 +22,6 @@ interface Props {
   setAnalyticsFocus: (focus: AnalyticsFocus) => void;
   chartSections: ChartSectionConfig[];
   setChartSections: React.Dispatch<React.SetStateAction<ChartSectionConfig[]>>;
-  metricOptions: MetricOption[];
   dispatchRows: TimeSeriesRow[];
   dispatchSeries: TimeSeriesSeries[];
   systemLoadRows: TimeSeriesRow[];
@@ -48,7 +47,6 @@ export function AnalyticsPane({
   results, filename, model, bounds, busIndex,
   analyticsFocus, setAnalyticsFocus,
   chartSections, setChartSections,
-  metricOptions,
   dispatchRows, dispatchSeries,
   systemLoadRows, systemPriceRows, storageRows,
   runHistory,
@@ -274,7 +272,7 @@ export function AnalyticsPane({
             <button className="ghost-button" onClick={() => {
               setChartSections((current) => [
                 ...current,
-                { id: Date.now(), metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false },
+                { id: Date.now(), focusType: 'system', focusKey: '', metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false },
               ]);
             }}>Add Chart</button>
           </div>
@@ -287,11 +285,12 @@ export function AnalyticsPane({
             <UserDefinedChartCard
               key={section.id}
               section={section}
-              metricOptions={metricOptions}
+              results={results}
+              model={model}
               onChange={(next) => setChartSections((current) => current.map((item) => (item.id === section.id ? next : item)))}
               onClean={() => setChartSections((current) => current.map((item) =>
                 item.id === section.id
-                  ? { ...item, metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false }
+                  ? { ...item, focusType: 'system', focusKey: '', metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false }
                   : item,
               ))}
               onRemove={() => setChartSections((current) => current.filter((item) => item.id !== section.id))}

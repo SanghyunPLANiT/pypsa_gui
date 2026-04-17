@@ -301,6 +301,8 @@ export interface MetricOption {
 
 export interface ChartSectionConfig {
   id: number;
+  focusType: AnalyticsFocus['type'];  // per-card component selection
+  focusKey: string;                   // empty for 'system'
   metricKey: string;
   chartType: ChartSectionType;
   timeframe: TimeframeOption;
