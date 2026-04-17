@@ -3087,20 +3087,25 @@ th:hover .col-filter-btn { opacity: 1; }
   margin: 0 0 12px;
   padding: 12px 16px 16px;
 }
-.ia-toolbar {
+.ia-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
-.ia-col-label {
-  font-size: 0.78rem;
+.ia-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ia-control-label {
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
 }
-.ia-col-select {
+.ia-select {
   font-size: 0.82rem;
   padding: 4px 8px;
   border: 1px solid var(--border-strong);
@@ -3109,10 +3114,15 @@ th:hover .col-filter-btn { opacity: 1; }
   color: var(--text);
   cursor: pointer;
 }
-.ia-summary {
+.ia-meta {
   font-size: 0.75rem;
   color: var(--muted);
   margin-left: auto;
+}
+.ia-tip {
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 12px 0;
 }
 .ia-chart-wrap {
   overflow-x: auto;
