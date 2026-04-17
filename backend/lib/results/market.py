@@ -114,7 +114,7 @@ def build_co2_shadow(network: pypsa.Network, carbon_price: float) -> dict[str, A
         "shadow_price": 0.0,
         "explicit_price": round(float(carbon_price), 2),
         "cap_value": None,
-        "cap_unit": "tCO₂/MWh",
+        "cap_unit": "kg CO₂e/MWh",
         "status": "none",
         "note": "No CO₂ constraint active in this run.",
     }
@@ -174,7 +174,7 @@ def build_co2_shadow(network: pypsa.Network, carbon_price: float) -> dict[str, A
 
     result["found"] = True
     result["constraint_name"] = name
-    result["cap_unit"] = "tCO₂/MWh"
+    result["cap_unit"] = "kg CO₂e/MWh"
     result["shadow_price"] = round(abs(mu), 4)
 
     if abs(mu) > BINDING_THRESHOLD:
@@ -182,7 +182,7 @@ def build_co2_shadow(network: pypsa.Network, carbon_price: float) -> dict[str, A
         result["note"] = (
             f"CO₂ intensity constraint is binding. "
             f"Shadow price = ${abs(mu):.4f}/tCO₂ — relaxing the intensity cap "
-            f"by 1 tCO₂/MWh would reduce system cost by ${abs(mu):.4f} per MWh dispatched."
+            f"by 1 kg CO₂e/MWh would reduce system cost by ${abs(mu)/1000:.6f} per MWh dispatched."
         )
     else:
         result["status"] = "slack"

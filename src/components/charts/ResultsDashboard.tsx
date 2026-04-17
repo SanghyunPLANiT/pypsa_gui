@@ -9,6 +9,7 @@ import { DurationCurveCard } from './DurationCurveCard';
 import { CapacityExpansionCard } from './CapacityExpansionCard';
 import { MeritOrderCard } from './MeritOrderCard';
 import { Co2ShadowCard } from './Co2ShadowCard';
+import { EmissionsBreakdownCard } from './EmissionsBreakdownCard';
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
@@ -266,6 +267,15 @@ export function ResultsDashboard({
       {results.expansionResults && results.expansionResults.length > 0 && (
         <DashboardSection title="Capacity expansion results" defaultOpen>
           <CapacityExpansionCard assets={results.expansionResults} />
+        </DashboardSection>
+      )}
+
+      {/* Emissions breakdown */}
+      {results.emissionsBreakdown && (
+        results.emissionsBreakdown.byCarrier.length > 0 || results.emissionsBreakdown.byGenerator.length > 0
+      ) && (
+        <DashboardSection title="Emissions by generator / carrier" defaultOpen>
+          <EmissionsBreakdownCard data={results.emissionsBreakdown} />
         </DashboardSection>
       )}
 

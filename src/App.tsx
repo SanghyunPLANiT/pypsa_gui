@@ -40,6 +40,7 @@ function AppInner() {
   const [snapshotEnd, setSnapshotEnd] = useState(24);
   const [snapshotWeight, setSnapshotWeight] = useState(1);
   const [constraints, setConstraints] = useState<CustomConstraint[]>(DEFAULT_CONSTRAINTS);
+  const [carbonPrice, setCarbonPrice] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
@@ -223,7 +224,7 @@ function AppInner() {
     const snapshotCount = snapshotEnd - snapshotStart;
     const runOptions = {
       model,
-      scenario: { constraints: constraints.filter((c) => c.enabled) },
+      scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
       options: { snapshotCount, snapshotStart, snapshotWeight },
     };
 
@@ -602,6 +603,27 @@ function AppInner() {
                 </p>
               </>
             )}
+            <div className="run-carbon-row">
+              <label className="run-carbon-label" htmlFor="run-carbon-price">
+                <span>💨 Carbon price</span>
+                <span className="run-carbon-unit">$/tCO₂</span>
+              </label>
+              <input
+                id="run-carbon-price"
+                type="number"
+                className="run-carbon-input"
+                min={0}
+                max={1000}
+                step={1}
+                value={carbonPrice}
+                onChange={(e) => setCarbonPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+              />
+              {carbonPrice > 0 && (
+                <span className="run-carbon-hint">
+                  Added to each generator's marginal cost proportional to CO₂ emissions
+                </span>
+              )}
+            </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
               <input
                 type="checkbox"

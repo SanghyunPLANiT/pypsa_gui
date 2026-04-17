@@ -48,6 +48,9 @@ def apply_custom_constraints(
             # Constraint: Σ(co2_factor_g × dispatch_g) ≤ value × Σ(dispatch_g)
             # where the sum runs over all non-shedding generators.
             if metric == "co2_cap":
+                # value is in kg CO₂e/MWh; emissions_factors are in tCO₂/MWh
+                # Convert: value_tco2 = value_kg / 1000
+                value_tco2 = value / 1000.0
                 emitters = [
                     (g, emissions_factors.get(n.generators.at[g, "carrier"], 0.0))
                     for g in n.generators.index
@@ -64,11 +67,11 @@ def apply_custom_constraints(
                     for g, co2 in emitters
                 )
                 total_dispatch = (gen_p.sel({dim: supply_gens}) * weights).sum()
-                # total_emissions ≤ value × total_dispatch
+                # total_emissions [tCO₂] ≤ value_tco2 [tCO₂/MWh] × total_dispatch [MWh]
                 n.model.add_constraints(
-                    total_emissions - value * total_dispatch <= 0, name=cname
+                    total_emissions - value_tco2 * total_dispatch <= 0, name=cname
                 )
-                notes.append(f"Constraint '{label}': CO₂ intensity ≤ {value} tCO₂/MWh added.")
+                notes.append(f"Constraint '{label}': CO₂ intensity ≤ {value} kg CO₂e/MWh added.")
 
             # ── Minimum renewable share ──────────────────────────────────────
             elif metric == "re_share":

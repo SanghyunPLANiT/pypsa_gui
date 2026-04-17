@@ -23,7 +23,6 @@ def add_generators(
     model: dict[str, list[dict[str, Any]]],
     snapshots: pd.Index,
     period_factor: float,
-    renewable_multiplier: float,
     carbon_price: float,
     notes: list[str],
     step: int = 1,
@@ -45,8 +44,6 @@ def add_generators(
         if not name or bus not in network.buses.index:
             continue
         p_nom = number(row.get("p_nom"), 0.0)
-        if carrier in {"Solar", "Wind", "Hydro"}:
-            p_nom *= renewable_multiplier
         marginal_cost = (
             number(row.get("marginal_cost"), 0.0)
             + carbon_price * _carrier_emissions(network, carrier)
@@ -95,7 +92,6 @@ def add_grid_imports_and_shedding(
     network: pypsa.Network,
     load_totals: dict[str, float],
     carbon_price: float,
-    storage_expansion: float,
     notes: list[str],
 ) -> str:
     """Add grid import generator and per-bus load shedding; return peak bus name."""
@@ -107,7 +103,6 @@ def add_grid_imports_and_shedding(
     cfg = load_system_defaults()
     gi_cfg = cfg["grid_imports"]
     ls_cfg = cfg["load_shedding"]
-    bess_cfg = cfg["system_bess"]
 
     network.add(
         "Generator",
@@ -131,23 +126,5 @@ def add_grid_imports_and_shedding(
             marginal_cost=float(ls_cfg["marginal_cost"]),
         )
         network.generators_t.p_max_pu.loc[:, shed_name] = 1.0
-
-    if storage_expansion > 0:
-        bess_carrier = bess_cfg["carrier"]
-        if bess_carrier not in network.carriers.index:
-            network.add("Carrier", bess_carrier, co2_emissions=0.0)
-        network.add(
-            "StorageUnit",
-            "system_bess",
-            bus=peak_bus,
-            carrier=bess_carrier,
-            p_nom=storage_expansion,
-            max_hours=float(bess_cfg["max_hours"]),
-            efficiency_store=float(bess_cfg["efficiency_store"]),
-            efficiency_dispatch=float(bess_cfg["efficiency_dispatch"]),
-            cyclic_state_of_charge=bool(bess_cfg["cyclic_state_of_charge"]),
-            marginal_cost=float(bess_cfg["marginal_cost"]),
-        )
-        notes.append(f"Added {storage_expansion:.0f} MW system BESS at {peak_bus}.")
 
     return peak_bus
