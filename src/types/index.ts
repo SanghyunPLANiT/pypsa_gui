@@ -242,6 +242,29 @@ export interface RunResults {
   };
 }
 
+// ── Run history ───────────────────────────────────────────────────────────────
+
+export interface RunHistoryEntry {
+  id: string;
+  label: string;
+  savedAt: string;
+  filename: string;
+  carbonPrice: number;
+  snapshotStart: number;
+  snapshotEnd: number;
+  snapshotWeight: number;
+  activeConstraints: CustomConstraint[];
+  componentCounts: {
+    generators: number;
+    buses: number;
+    lines: number;
+    links: number;
+    storageUnits: number;
+  };
+  pinned: boolean;
+  results: RunResults;
+}
+
 export type AnalyticsFocus =
   | { type: 'system' }
   | { type: 'generator'; key: string }
