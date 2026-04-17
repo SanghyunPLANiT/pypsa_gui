@@ -14,7 +14,9 @@ export type BrowserFileHandle = any;
 
 // ── UI state ──────────────────────────────────────────────────────────────────
 
-export type WorkspaceTab = 'Map' | 'Tables' | 'Validation' | 'Analytics';
+export type WorkspaceTab = 'Model' | 'Analytics';
+export type ModelSubTab = 'Map' | 'Table';
+export type AnalyticsSubTab = 'Validation' | 'Result' | 'Analytics';
 export type ChartMode = 'line' | 'area' | 'bar';
 export type ChartSectionType = ChartMode | 'donut';
 export type TimeframeOption = 'aggregated' | 'yearly' | 'monthly' | 'weekly' | 'daily' | 'hourly';

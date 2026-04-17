@@ -17,6 +17,8 @@ import {
   TsSheetName,
   WorkbookModel,
   WorkspaceTab,
+  ModelSubTab,
+  AnalyticsSubTab,
 } from './types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, EMPTY_METRIC_KEY } from './constants';
 import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './shared/utils/workbook';
@@ -34,7 +36,9 @@ import { ToastProvider, useToast } from './shared/components/Toast';
 function AppInner() {
   const { showToast } = useToast();
   const [model, setModel] = useState<WorkbookModel>(() => createEmptyWorkbook());
-  const [tab, setTab] = useState<WorkspaceTab>('Map');
+  const [tab, setTab] = useState<WorkspaceTab>('Model');
+  const [modelSubTab, setModelSubTab] = useState<ModelSubTab>('Map');
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<AnalyticsSubTab>('Result');
   const [results, setResults] = useState<RunResults | null>(null);
   const [runStatus, setRunStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [maxSnapshots, setMaxSnapshots] = useState<number>(1);
@@ -182,6 +186,7 @@ function AppInner() {
   const handleRestoreRun = (entry: RunHistoryEntry) => {
     setResults(entry.results);
     setTab('Analytics');
+    setAnalyticsSubTab('Result');
     setAnalyticsFocus({ type: 'system' });
     showToast(`Viewing ${entry.label}`, 'success');
   };
@@ -280,7 +285,8 @@ function AppInner() {
         });
         const result = await response.json();
         setValidateResult(result);
-        setTab('Validation');
+        setTab('Analytics');
+        setAnalyticsSubTab('Validation');
         const vMsg = result.valid ? 'Validation passed.' : `Validation failed: ${result.errors.length} error(s).`;
         setStatus(vMsg);
         showToast(vMsg, result.valid ? 'success' : 'error');
@@ -481,15 +487,17 @@ function AppInner() {
           <span className="topbar-status" title={status}>{status}</span>
         </div>
         <nav className="tab-nav">
-          {(['Map', 'Tables', 'Validation', 'Analytics'] as WorkspaceTab[]).map((item) => (
+          {(['Model', 'Analytics'] as WorkspaceTab[]).map((item) => (
             <button
               key={item}
-              className={`tab-button ${tab === item ? 'is-active' : ''} ${item === 'Validation' && validateResult && !validateResult.valid ? 'tab-button--error' : ''} ${item === 'Validation' && validateResult && validateResult.valid ? 'tab-button--ok' : ''}`}
+              className={`tab-button ${tab === item ? 'is-active' : ''}`}
               onClick={() => setTab(item)}
             >
               {item}
-              {item === 'Validation' && validateResult && (
-                <span className="tab-badge">{validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}</span>
+              {item === 'Analytics' && validateResult && (
+                <span className={`tab-badge ${validateResult.valid ? 'tab-badge--ok' : 'tab-badge--error'}`}>
+                  {validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}
+                </span>
               )}
             </button>
           ))}
@@ -531,54 +539,102 @@ function AppInner() {
         </aside>
 
         <div className="workspace-main">
-          {tab === 'Map' && (
-            <MapPane model={model} bounds={bounds} busIndex={busIndex} />
-          )}
 
-          {tab === 'Tables' && (
-            <div className="pane tables-pane">
-              <TablesPane
-                model={model}
-                onUpdate={updateRowValue}
-                onAddRow={addRow}
-                onDeleteRow={deleteRow}
-                onAddColumn={addColumn}
-                onImportTsSheet={handleImportTsSheet}
-              />
+          {/* ── Model tab ── */}
+          {tab === 'Model' && (
+            <div className="pane model-pane">
+              <div className="pane-header model-pane-header">
+                <nav className="subnav">
+                  {(['Map', 'Table'] as ModelSubTab[]).map((s) => (
+                    <button
+                      key={s}
+                      className={`subnav-btn${modelSubTab === s ? ' subnav-btn--active' : ''}`}
+                      onClick={() => setModelSubTab(s)}
+                    >{s}</button>
+                  ))}
+                </nav>
+              </div>
+              {modelSubTab === 'Map' && (
+                <MapPane model={model} bounds={bounds} busIndex={busIndex} />
+              )}
+              {modelSubTab === 'Table' && (
+                <TablesPane
+                  model={model}
+                  onUpdate={updateRowValue}
+                  onAddRow={addRow}
+                  onDeleteRow={deleteRow}
+                  onAddColumn={addColumn}
+                  onImportTsSheet={handleImportTsSheet}
+                />
+              )}
             </div>
           )}
 
-          {tab === 'Validation' && (
-            <ValidationPane
-              validateResult={validateResult}
-              onValidate={() => { setDryRun(true); setRunDialogOpen(true); }}
-              onRun={() => { setDryRun(false); setRunDialogOpen(true); }}
-            />
-          )}
-
+          {/* ── Analytics tab ── */}
           {tab === 'Analytics' && (
-            !results ? (
-              <EmptyAnalytics />
-            ) : (
-              <AnalyticsPane
-                results={results}
-                filename={filename}
-                model={model}
-                bounds={bounds}
-                busIndex={busIndex}
-                analyticsFocus={analyticsFocus}
-                setAnalyticsFocus={setAnalyticsFocus}
-                chartSections={chartSections}
-                setChartSections={setChartSections}
-                metricOptions={metricOptions}
-                dispatchRows={systemDispatchRows}
-                dispatchSeries={systemDispatchSeries}
-                systemLoadRows={systemLoadRows}
-                systemPriceRows={systemPriceRows}
-                storageRows={storageRows}
-                runHistory={runHistory}
-              />
-            )
+            <div className="pane analytics-outer-pane">
+              <div className="pane-header analytics-outer-header">
+                <nav className="subnav">
+                  {(['Validation', 'Result', 'Analytics'] as AnalyticsSubTab[]).map((s) => (
+                    <button
+                      key={s}
+                      className={`subnav-btn${analyticsSubTab === s ? ' subnav-btn--active' : ''}${
+                        s === 'Validation' && validateResult && !validateResult.valid ? ' subnav-btn--error' : ''}${
+                        s === 'Validation' && validateResult?.valid ? ' subnav-btn--ok' : ''}`}
+                      onClick={() => setAnalyticsSubTab(s)}
+                    >
+                      {s}
+                      {s === 'Validation' && validateResult && (
+                        <span className={`tab-badge ${validateResult.valid ? 'tab-badge--ok' : 'tab-badge--error'}`}>
+                          {validateResult.valid ? '✓' : validateResult.errors.length + validateResult.warnings.length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
+                {results && analyticsSubTab !== 'Validation' && (
+                  <div className="inline-stats">
+                    <span>{filename}</span>
+                    <span>{results.runMeta.snapshotCount} snapshots</span>
+                    <span>{results.runMeta.snapshotWeight}h weight</span>
+                  </div>
+                )}
+              </div>
+
+              {analyticsSubTab === 'Validation' && (
+                <ValidationPane
+                  validateResult={validateResult}
+                  onValidate={() => { setDryRun(true); setRunDialogOpen(true); }}
+                  onRun={() => { setDryRun(false); setRunDialogOpen(true); }}
+                />
+              )}
+
+              {(analyticsSubTab === 'Result' || analyticsSubTab === 'Analytics') && (
+                !results ? (
+                  <EmptyAnalytics />
+                ) : (
+                  <AnalyticsPane
+                    results={results}
+                    filename={filename}
+                    model={model}
+                    bounds={bounds}
+                    busIndex={busIndex}
+                    analyticsFocus={analyticsFocus}
+                    setAnalyticsFocus={setAnalyticsFocus}
+                    chartSections={chartSections}
+                    setChartSections={setChartSections}
+                    metricOptions={metricOptions}
+                    dispatchRows={systemDispatchRows}
+                    dispatchSeries={systemDispatchSeries}
+                    systemLoadRows={systemLoadRows}
+                    systemPriceRows={systemPriceRows}
+                    storageRows={storageRows}
+                    runHistory={runHistory}
+                    subTab={analyticsSubTab}
+                  />
+                )
+              )}
+            </div>
           )}
         </div>
       </div>

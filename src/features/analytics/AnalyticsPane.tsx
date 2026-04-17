@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
-  AnalyticsFocus, ChartSectionConfig, GridRow, MetricOption, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
+  AnalyticsFocus, AnalyticsSubTab, ChartSectionConfig, GridRow, MetricOption, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../shared/types';
 import { EMPTY_METRIC_KEY } from '../../constants';
 import { numberValue, stringValue, carrierColor, loadingColor } from '../../shared/utils/helpers';
@@ -29,6 +29,7 @@ interface Props {
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
   runHistory: RunHistoryEntry[];
+  subTab: AnalyticsSubTab;
 }
 
 function EmptyAnalytics() {
@@ -52,6 +53,7 @@ export function AnalyticsPane({
   dispatchRows, dispatchSeries,
   systemLoadRows, systemPriceRows, storageRows,
   runHistory,
+  subTab,
 }: Props) {
   const focusTitle =
     analyticsFocus.type === 'system' ? 'System analytics' : analyticsFocus.key;
@@ -102,35 +104,10 @@ export function AnalyticsPane({
     : analyticsFocus.type === 'branch' ? results.assetDetails.branches[analyticsFocus.key]?.summary || []
     : results.summary;
 
-  const [subTab, setSubTab] = useState<'results' | 'analytics'>('results');
-
   return (
     <div className="pane analytics-pane">
-      {/* Pane header with sub-tab nav */}
-      <div className="pane-header analytics-pane-header">
-        <div className="analytics-subtab-nav">
-          <button
-            className={`analytics-subtab${subTab === 'results' ? ' analytics-subtab--active' : ''}`}
-            onClick={() => setSubTab('results')}
-          >
-            Results
-          </button>
-          <button
-            className={`analytics-subtab${subTab === 'analytics' ? ' analytics-subtab--active' : ''}`}
-            onClick={() => setSubTab('analytics')}
-          >
-            Analytics
-          </button>
-        </div>
-        <div className="inline-stats">
-          <span>{filename}</span>
-          <span>{results.runMeta.snapshotCount} snapshots</span>
-          <span>{results.runMeta.snapshotWeight} h weight</span>
-        </div>
-      </div>
-
-      {/* ── Results tab — predefined charts ───────────────────────────── */}
-      {subTab === 'results' && (
+      {/* ── Result sub-tab — predefined charts ───────────────────────── */}
+      {subTab === 'Result' && (
         <ResultsDashboard
           results={results}
           dispatchRows={dispatchRows}
@@ -142,8 +119,8 @@ export function AnalyticsPane({
         />
       )}
 
-      {/* ── Analytics tab — map + user-defined charts ─────────────────── */}
-      {subTab === 'analytics' && <>
+      {/* ── Analytics sub-tab — map + user-defined charts ───────────── */}
+      {subTab === 'Analytics' && <>
 
       {/* Map section */}
       <section className="chart-card analytics-map-card">
