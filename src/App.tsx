@@ -473,13 +473,9 @@ function AppInner() {
           <button className="run-button" onClick={() => setRunDialogOpen(true)}>▶ Run</button>
           <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
           <div className="topbar-divider" />
-          <div className="case-chip">
-            <strong>{filename}</strong>
-          </div>
+          <span className="topbar-file">{filename}</span>
           {results && (
-            <div className="case-chip">
-              <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h res</strong>
-            </div>
+            <span className="topbar-run-meta">{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h res</span>
           )}
           <span className="topbar-status" title={status}>{status}</span>
         </div>

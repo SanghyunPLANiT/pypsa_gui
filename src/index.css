@@ -350,25 +350,17 @@ button {
   white-space: nowrap;
 }
 
-.case-chip {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
+.topbar-file {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
-.case-chip span {
+.topbar-run-meta {
   font-size: 0.78rem;
   color: var(--muted);
-}
-
-.case-chip strong {
-  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .tab-nav {
