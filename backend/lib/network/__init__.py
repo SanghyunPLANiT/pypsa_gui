@@ -79,20 +79,27 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     for carrier_name in system_carriers:
         network.add("Carrier", carrier_name, co2_emissions=0.0)
 
+    # Scenario parameters
+    carbon_price = number(scenario.get("carbonPrice"), 0.0)
+    discount_rate = number(scenario.get("discountRate"), 0.05)
+    re_target = number(scenario.get("renewableTarget"), 0.0)
+
     # Topology
     add_buses(network, model)
     load_totals = add_loads(network, model, snapshots, number(scenario.get("demandGrowth"), 0.0), step=step)
     add_stores(network, model, period_factor, notes)
-    add_storage_units(network, model, period_factor, notes)
+    add_storage_units(network, model, period_factor, notes, discount_rate=discount_rate)
     add_shunt_impedances(network, model)
 
     # Generation
-    re_target = number(scenario.get("renewableTarget"), 0.0)
     # Scale up renewable capacity so the model can physically achieve the target.
     # Formula: +1 % capacity per 1 % target (capped at 2× for targets above 100 %).
     renewable_multiplier = 1.0 + max(0.0, re_target) / 100.0
-    carbon_price = number(scenario.get("carbonPrice"), 0.0)
-    add_generators(network, model, snapshots, period_factor, renewable_multiplier, carbon_price, notes, step=step)
+    add_generators(
+        network, model, snapshots, period_factor,
+        renewable_multiplier, carbon_price, notes,
+        step=step, discount_rate=discount_rate,
+    )
     if re_target > 0:
         notes.append(
             f"RE target {re_target:.0f}%: scaled Solar/Wind/Hydro capacity by {renewable_multiplier:.2f}×; "

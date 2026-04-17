@@ -6,7 +6,8 @@ import pandas as pd
 import pypsa
 
 from ..config import load_system_defaults
-from ..utils.coerce import number, text
+from ..utils.annuity import annuity_factor
+from ..utils.coerce import bool_value, number, text
 from ..utils.workbook import apply_scaled_static_attributes, workbook_rows
 from .buses import parse_ts_sheet
 
@@ -26,6 +27,7 @@ def add_generators(
     carbon_price: float,
     notes: list[str],
     step: int = 1,
+    discount_rate: float = 0.05,
 ) -> None:
     generators = workbook_rows(model, "generators")
     if not generators:
@@ -50,6 +52,18 @@ def add_generators(
             + carbon_price * _carrier_emissions(network, carrier)
         )
         p_max_pu_static = number(row.get("p_max_pu"), 1.0)
+        extendable = bool_value(row.get("extendable"), False)
+        raw_capital_cost = number(row.get("capital_cost"), 0.0)
+        if extendable:
+            lifetime = number(row.get("asset_lifetime"), 20.0)
+            af = annuity_factor(discount_rate, lifetime)
+            annualised_capital_cost = raw_capital_cost * af
+            notes.append(
+                f"Generator '{name}' is extendable (lifetime={lifetime:.0f}yr, "
+                f"AF={af:.4f}, annualised capex={annualised_capital_cost:.0f} $/MW/yr)."
+            )
+        else:
+            annualised_capital_cost = 0.0
         network.add(
             "Generator",
             name,
@@ -61,7 +75,8 @@ def add_generators(
             p_min_pu=0.0,
             p_max_pu=p_max_pu_static,
             marginal_cost=marginal_cost,
-            capital_cost=number(row.get("capital_cost"), 0.0),
+            capital_cost=annualised_capital_cost,
+            p_nom_extendable=extendable,
             committable=False,
         )
         applied = apply_scaled_static_attributes(network.generators, name, row, period_factor)

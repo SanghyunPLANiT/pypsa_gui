@@ -152,6 +152,20 @@ export interface BranchDetail {
   lossesSeries: Array<{ label: string; timestamp: string; losses: number }>;
 }
 
+// ── Capacity expansion result ─────────────────────────────────────────────────
+
+export interface ExpansionAsset {
+  name: string;
+  component: 'Generator' | 'StorageUnit';
+  carrier: string;
+  bus: string;
+  p_nom_mw: number;
+  p_nom_opt_mw: number;
+  delta_mw: number;
+  capital_cost: number;
+  capex_annual: number;
+}
+
 export interface RunResults {
   summary: SummaryItem[];
   dispatchSeries: SeriesPoint[];
@@ -163,6 +177,7 @@ export interface RunResults {
   costBreakdown: Array<{ label: string; value: number }>;
   nodalBalance: Array<{ label: string; load: number; generation: number }>;
   lineLoading: Array<{ label: string; value: number }>;
+  expansionResults?: ExpansionAsset[];
   narrative: string[];
   runMeta: {
     snapshotCount: number;

@@ -4,6 +4,7 @@ from typing import Any
 
 import pypsa
 
+from ..utils.annuity import annuity_factor
 from ..utils.coerce import bool_value, number, text
 from ..utils.workbook import apply_scaled_static_attributes, workbook_rows
 
@@ -44,6 +45,7 @@ def add_storage_units(
     model: dict[str, list[dict[str, Any]]],
     period_factor: float,
     notes: list[str],
+    discount_rate: float = 0.05,
 ) -> None:
     for row in workbook_rows(model, "storage_units"):
         name = text(row.get("name"))
@@ -53,18 +55,33 @@ def add_storage_units(
         carrier = text(row.get("carrier"), "Storage")
         if carrier not in network.carriers.index:
             network.add("Carrier", carrier, co2_emissions=0.0)
+        extendable = bool_value(row.get("extendable"), False)
+        raw_capital_cost = number(row.get("capital_cost"), 0.0)
+        if extendable:
+            lifetime = number(row.get("asset_lifetime"), 15.0)
+            af = annuity_factor(discount_rate, lifetime)
+            annualised_capital_cost = raw_capital_cost * af
+            notes.append(
+                f"StorageUnit '{name}' is extendable (lifetime={lifetime:.0f}yr, "
+                f"AF={af:.4f}, annualised capex={annualised_capital_cost:.0f} $/MW/yr)."
+            )
+        else:
+            annualised_capital_cost = 0.0
         network.add(
             "StorageUnit",
             name,
             bus=bus,
             carrier=carrier,
             p_nom=number(row.get("p_nom"), 0.0),
+            p_nom_extendable=extendable,
+            p_nom_min=0.0,
             max_hours=number(row.get("max_hours"), 1.0),
             efficiency_store=number(row.get("efficiency_store"), 1.0),
             efficiency_dispatch=number(row.get("efficiency_dispatch"), 1.0),
             state_of_charge_initial=number(row.get("state_of_charge_initial"), 0.0),
             cyclic_state_of_charge=bool_value(row.get("cyclic_state_of_charge"), True),
             marginal_cost=number(row.get("marginal_cost"), 0.0),
+            capital_cost=annualised_capital_cost,
         )
         applied = apply_scaled_static_attributes(network.storage_units, name, row, period_factor)
         if applied:

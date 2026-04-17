@@ -26,6 +26,7 @@ from .dispatch import (
     build_storage_series,
     dispatch_by_carrier,
 )
+from .expansion import build_expansion_results
 
 
 def run_pypsa(payload: RunPayload) -> dict[str, Any]:
@@ -138,11 +139,17 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
             fuel_cost += fuel_component
             carbon_cost += carbon_component
 
+    # Expansion CAPEX (annualised)
+    expansion_results = build_expansion_results(network)
+    total_capex_annual = sum(r["capex_annual"] for r in expansion_results)
+
     cost_breakdown = [
         {"label": "Fuel cost", "value": round(fuel_cost)},
         {"label": "Carbon cost", "value": round(carbon_cost)},
         {"label": "Load shedding", "value": round(shed_cost)},
     ]
+    if total_capex_annual > 0:
+        cost_breakdown.append({"label": "Capital cost", "value": round(total_capex_annual)})
 
     # Series
     dispatch_s, gen_dispatch_s = build_dispatch_series(network, by_carrier, load_dispatch, generator_dispatch_frame)
@@ -209,6 +216,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         "costBreakdown": cost_breakdown,
         "nodalBalance": nodal_balance,
         "lineLoading": line_loading,
+        "expansionResults": expansion_results,
         "narrative": notes,
         "runMeta": {
             "snapshotCount": snapshot_count,
