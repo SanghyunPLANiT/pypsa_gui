@@ -74,7 +74,13 @@ export function UserDefinedChartCard({
 
   // Per-card metric options derived from the card's own focusType/focusKey
   const focus = sectionFocus(section);
-  const metricOptions: MetricOption[] = useMetricOptions(results, model, focus);
+  const assetNames = assetNamesFor(section.focusType, model);
+  const selectedAssetKeys = section.focusType === 'system'
+    ? []
+    : section.focusKey === '__all__'
+      ? assetNames
+      : (section.focusKey ? [section.focusKey] : []);
+  const metricOptions: MetricOption[] = useMetricOptions(results, model, focus, selectedAssetKeys);
 
   const metric = metricOptions.find((item) => item.key === section.metricKey);
   const hasMetric = Boolean(metric);
@@ -88,10 +94,6 @@ export function UserDefinedChartCard({
   const aggregatedRows = hasMetric
     ? aggregateMetricRows(metric!, safeStart, safeEnd, section.timeframe)
     : [];
-  const allowDonut = Boolean(metric?.allowDonut);
-
-  // Asset names for the sub-selector (non-system components)
-  const assetNames = assetNamesFor(section.focusType, model);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -125,10 +127,6 @@ export function UserDefinedChartCard({
       metricKey: newKey,
       startIndex: 0,
       endIndex: Math.max(len - 1, 0),
-      chartType:
-        newKey !== EMPTY_METRIC_KEY && newMetric?.allowDonut
-          ? section.chartType
-          : section.chartType === 'donut' ? 'line' : section.chartType,
     });
   };
 
@@ -208,6 +206,7 @@ export function UserDefinedChartCard({
               value={section.focusKey}
               onChange={(e) => handleFocusKeyChange(e.target.value)}
             >
+              <option value="__all__">All</option>
               {assetNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -257,7 +256,7 @@ export function UserDefinedChartCard({
             <option value="line">Line</option>
             <option value="area">Area</option>
             <option value="bar">Bar</option>
-            <option value="donut" disabled={!allowDonut}>Donut</option>
+            <option value="donut">Donut</option>
           </select>
         </label>
 
