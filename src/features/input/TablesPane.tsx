@@ -565,11 +565,8 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
               onChange={handleCsvFile}
             />
             <button className="ghost-button sm" onClick={() => csvInputRef.current?.click()}>
-              📥 Import CSV
+              Import CSV
             </button>
-            {rows.length > 0 && (
-              <span className="ts-row-count">{rows.length} rows loaded</span>
-            )}
             {rows.length > 0 && (
               <button
                 className="ghost-button sm danger"
@@ -579,14 +576,13 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
                 Clear
               </button>
             )}
-            <span className="ts-chip">first col = snapshot label · remaining cols = component names</span>
             {rows.length > 0 && (
               <button
                 className={`ghost-button sm${showAnalyser ? ' ghost-button--active' : ''}`}
                 onClick={() => setShowAnalyser((v) => !v)}
                 title="Toggle input data analyser"
               >
-                📊 Analyse
+                Analyse
               </button>
             )}
           </div>
@@ -621,7 +617,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
                 onClick={() => setShowAnalyser((v) => !v)}
                 title="Toggle input data analyser"
               >
-                📊 Analyse
+                Analyse
               </button>
             )}
           </div>
