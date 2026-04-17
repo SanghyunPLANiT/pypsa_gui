@@ -20,6 +20,7 @@ export const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
     name: 'new_generator', bus: 'New Bus', control: 'PV', carrier: 'LNG',
     p_nom: 100, p_nom_min: 0, p_min_pu: 0.3, p_max_pu: 1, p_set: 70, q_set: 0,
     marginal_cost: 75, capital_cost: 0, committable: true,
+    extendable: false, asset_lifetime: 20,
   },
   loads: { name: 'new_load', bus: 'New Bus', carrier: 'load', p_set: 100, q_set: 0, sign: 1 },
   links: {
@@ -38,6 +39,7 @@ export const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
     name: 'new_storage_unit', bus: 'New Bus', carrier: 'battery', p_nom: 200,
     max_hours: 4, efficiency_store: 0.91, efficiency_dispatch: 0.91,
     state_of_charge_initial: 0, cyclic_state_of_charge: true, marginal_cost: 5,
+    capital_cost: 0, extendable: false, asset_lifetime: 15,
   },
   transformers: {
     name: 'new_transformer', bus0: 'New Bus', bus1: 'New Bus', type: '', model: 't',

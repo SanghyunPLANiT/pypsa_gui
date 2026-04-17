@@ -6,6 +6,7 @@ import { useToast } from '../common/Toast';
 import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { DonutChart } from './DonutChart';
 import { DurationCurveCard } from './DurationCurveCard';
+import { CapacityExpansionCard } from './CapacityExpansionCard';
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ const COST_COLORS: Record<string, string> = {
   'Fuel cost': '#f97316',
   'Carbon cost': '#16a34a',
   'Load shedding': '#dc2626',
+  'Capital cost': '#6366f1',
 };
 
 // ── Main dashboard ────────────────────────────────────────────────────────────
@@ -253,6 +255,13 @@ export function ResultsDashboard({
               stacked={false}
             />
           </div>
+        </DashboardSection>
+      )}
+
+      {/* Capacity expansion */}
+      {results.expansionResults && results.expansionResults.length > 0 && (
+        <DashboardSection title="Capacity expansion results" defaultOpen>
+          <CapacityExpansionCard assets={results.expansionResults} />
         </DashboardSection>
       )}
     </div>
