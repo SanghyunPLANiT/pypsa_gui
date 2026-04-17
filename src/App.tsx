@@ -479,7 +479,6 @@ function AppInner() {
           {results && (
             <div className="case-chip">
               <strong>{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h res</strong>
-              <span className={`sc-status sc-status--${runStatus}`}>{runStatus === 'running' ? 'Running…' : runStatus === 'error' ? 'Error' : 'Done'}</span>
             </div>
           )}
           <span className="topbar-status" title={status}>{status}</span>
