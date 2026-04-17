@@ -152,6 +152,28 @@ export interface BranchDetail {
   lossesSeries: Array<{ label: string; timestamp: string; losses: number }>;
 }
 
+// ── Market analysis types ─────────────────────────────────────────────────────
+
+export interface MeritOrderEntry {
+  name: string;
+  carrier: string;
+  bus: string;
+  marginal_cost: number;
+  p_nom: number;
+  cumulative_mw: number;
+  color: string;
+}
+
+export interface Co2Shadow {
+  found: boolean;
+  constraint_name: string | null;
+  shadow_price: number;
+  explicit_price: number;
+  cap_ktco2: number | null;
+  status: 'binding' | 'slack' | 'none';
+  note: string;
+}
+
 // ── Capacity expansion result ─────────────────────────────────────────────────
 
 export interface ExpansionAsset {
@@ -178,6 +200,8 @@ export interface RunResults {
   nodalBalance: Array<{ label: string; load: number; generation: number }>;
   lineLoading: Array<{ label: string; value: number }>;
   expansionResults?: ExpansionAsset[];
+  meritOrder?: MeritOrderEntry[];
+  co2Shadow?: Co2Shadow;
   narrative: string[];
   runMeta: {
     snapshotCount: number;

@@ -2056,6 +2056,97 @@ path.leaflet-interactive:focus {
 }
 .expansion-table-wrap { overflow-x: auto; }
 
+/* ── Merit Order Card ────────────────────────────────────────────────────── */
+.merit-card { padding: 8px 4px; }
+.merit-svg { font-family: 'IBM Plex Sans', sans-serif; }
+.merit-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0 4px 56px;
+}
+.merit-stats {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 6px 0 4px 56px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.merit-stats strong { color: var(--text); }
+.merit-empty {
+  padding: 24px 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── CO₂ Shadow Price Card ───────────────────────────────────────────────── */
+.co2-shadow-card { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.co2-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+.co2-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.co2-status-label { font-size: 0.82rem; font-weight: 600; }
+.co2-constraint-name { font-size: 0.78rem; color: var(--muted); margin-left: 4px; }
+
+.co2-kpi-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.co2-kpi {
+  flex: 1 1 100px;
+  padding: 10px 14px;
+  min-width: 100px;
+}
+.co2-kpi-divider { width: 1px; background: var(--border); align-self: stretch; }
+.co2-kpi-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 2px; }
+.co2-kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.1; color: var(--text); }
+.co2-kpi-unit { font-size: 0.72rem; color: var(--muted); }
+
+.co2-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border-left: 3px solid var(--border);
+}
+
+.co2-interpretation {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.6;
+  padding: 10px 12px;
+  background: rgba(37,99,235,0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(37,99,235,0.12);
+}
+.co2-interpretation h4 {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.co2-interpretation ul { margin: 0; padding-left: 16px; }
+.co2-interpretation li { margin-bottom: 4px; }
+.co2-interpretation p { margin: 0; }
+
 .duration-curve-card { padding: 8px; }
 
 @media (max-width: 860px) {

@@ -27,6 +27,7 @@ from .dispatch import (
     dispatch_by_carrier,
 )
 from .expansion import build_expansion_results
+from .market import build_co2_shadow, build_merit_order
 
 
 def run_pypsa(payload: RunPayload) -> dict[str, Any]:
@@ -143,6 +144,10 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     expansion_results = build_expansion_results(network)
     total_capex_annual = sum(r["capex_annual"] for r in expansion_results)
 
+    # Market analysis — merit order + CO₂ shadow price (pure post-processing)
+    merit_order = build_merit_order(network)
+    co2_shadow = build_co2_shadow(network, float(scenario.get("carbonPrice", 0.0)))
+
     cost_breakdown = [
         {"label": "Fuel cost", "value": round(fuel_cost)},
         {"label": "Carbon cost", "value": round(carbon_cost)},
@@ -217,6 +222,8 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         "nodalBalance": nodal_balance,
         "lineLoading": line_loading,
         "expansionResults": expansion_results,
+        "meritOrder": merit_order,
+        "co2Shadow": co2_shadow,
         "narrative": notes,
         "runMeta": {
             "snapshotCount": snapshot_count,

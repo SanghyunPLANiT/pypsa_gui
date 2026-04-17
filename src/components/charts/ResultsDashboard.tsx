@@ -7,6 +7,8 @@ import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { DonutChart } from './DonutChart';
 import { DurationCurveCard } from './DurationCurveCard';
 import { CapacityExpansionCard } from './CapacityExpansionCard';
+import { MeritOrderCard } from './MeritOrderCard';
+import { Co2ShadowCard } from './Co2ShadowCard';
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +125,8 @@ export function ResultsDashboard({
     .map((r) => numberValue(r['load'] as number | string | undefined))
     .filter((v) => v > 0)
     .sort((a, b) => b - a);
+
+  const peakLoad = sortedLoad.length > 0 ? sortedLoad[0] : undefined;
 
   const sortedPrice: number[] = systemPriceRows
     .map((r) => numberValue(r['price'] as number | string | undefined))
@@ -264,6 +268,27 @@ export function ResultsDashboard({
           <CapacityExpansionCard assets={results.expansionResults} />
         </DashboardSection>
       )}
+
+      {/* Market analysis row — merit order + CO₂ shadow price */}
+      <div className="dashboard-row">
+        <DashboardSection title="Merit order (supply stack)" defaultOpen>
+          <MeritOrderCard
+            entries={results.meritOrder ?? []}
+            systemLoad={peakLoad}
+          />
+        </DashboardSection>
+        <DashboardSection title="CO₂ constraint shadow price">
+          <Co2ShadowCard shadow={results.co2Shadow ?? {
+            found: false,
+            constraint_name: null,
+            shadow_price: 0,
+            explicit_price: 0,
+            cap_ktco2: null,
+            status: 'none',
+            note: 'Run the model to see CO₂ shadow price.',
+          }} />
+        </DashboardSection>
+      </div>
     </div>
   );
 }
