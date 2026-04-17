@@ -163,6 +163,16 @@ function AppInner() {
     setStatus(`Removed row ${rowIndex + 1} from ${sheet}.`);
   };
 
+  const addColumn = (sheet: SheetName, col: string, defaultValue: string | number | boolean) => {
+    setModel((current) => {
+      const nextRows = current[sheet].map((row) =>
+        col in row ? row : { ...row, [col]: defaultValue },
+      );
+      return { ...current, [sheet]: nextRows };
+    });
+    setStatus(`Added column "${col}" to ${sheet}.`);
+  };
+
   const saveAsWorkbook = async () => {
     const saver = (window as any).showSaveFilePicker;
     const suggestedName = filename || 'pypsa_studio_case.xlsx';
@@ -491,6 +501,7 @@ function AppInner() {
                 onUpdate={updateRowValue}
                 onAddRow={addRow}
                 onDeleteRow={deleteRow}
+                onAddColumn={addColumn}
               />
             </div>
           )}
