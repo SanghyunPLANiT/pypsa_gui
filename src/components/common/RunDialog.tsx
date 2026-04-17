@@ -5,7 +5,8 @@
  * and routing. All run options (snapshot window, resolution, carbon
  * price, dry-run toggle) live here; the parent owns the state values.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
+import { GridRow } from '../../types';
 import { DualRangeSlider } from './DualRangeSlider';
 
 export interface RunDialogProps {
@@ -18,6 +19,7 @@ export interface RunDialogProps {
   snapshotWeight: number;
   carbonPrice: number;
   dryRun: boolean;
+  snapshots: GridRow[];
 
   onSnapshotStartChange: (v: number) => void;
   onSnapshotEndChange: (v: number) => void;
@@ -28,6 +30,32 @@ export interface RunDialogProps {
   onRun: () => void;
 }
 
+// ── Snapshot datetime helpers ─────────────────────────────────────────────────
+
+function getRawSnapshotStr(index: number, snapshots: GridRow[]): string {
+  const row = snapshots[index];
+  if (!row) return '';
+  const raw = String(row.snapshot ?? row.name ?? row.datetime ?? '').trim();
+  return raw.toLowerCase() === 'now' ? '' : raw;
+}
+
+function formatSnapLabel(index: number, snapshots: GridRow[], multiYear: boolean): string {
+  const raw = getRawSnapshotStr(index, snapshots);
+  if (!raw) return String(index);
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    const mo = d.toLocaleString('en', { month: 'short' });
+    const day = d.getDate();
+    const hr = d.getHours().toString().padStart(2, '0') + ':00';
+    return multiYear ? `${d.getFullYear()} ${mo} ${day}` : `${mo} ${day} ${hr}`;
+  } catch {
+    return raw;
+  }
+}
+
+// ── RunDialog ─────────────────────────────────────────────────────────────────
+
 export function RunDialog({
   open,
   onClose,
@@ -37,6 +65,7 @@ export function RunDialog({
   snapshotWeight,
   carbonPrice,
   dryRun,
+  snapshots,
   onSnapshotStartChange,
   onSnapshotEndChange,
   onSnapshotWeightChange,
@@ -44,7 +73,42 @@ export function RunDialog({
   onDryRunChange,
   onRun,
 }: RunDialogProps) {
+  // Detect whether snapshots have real datetimes and whether they span multiple years
+  const { hasDatetimes, multiYear, yearMarkers } = useMemo(() => {
+    if (!snapshots.length) return { hasDatetimes: false, multiYear: false, yearMarkers: [] };
+
+    const firstRaw = getRawSnapshotStr(0, snapshots);
+    if (!firstRaw) return { hasDatetimes: false, multiYear: false, yearMarkers: [] };
+    const firstDate = new Date(firstRaw);
+    if (isNaN(firstDate.getTime())) return { hasDatetimes: false, multiYear: false, yearMarkers: [] };
+
+    // Compute year boundary markers across the full snapshot array
+    const seen = new Set<number>();
+    const markers: Array<{ year: number; pct: number }> = [];
+    const total = snapshots.length;
+    for (let i = 0; i < total; i++) {
+      const raw = getRawSnapshotStr(i, snapshots);
+      if (!raw) break;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) break;
+      const yr = d.getFullYear();
+      if (!seen.has(yr)) {
+        seen.add(yr);
+        markers.push({ year: yr, pct: total > 1 ? (i / (total - 1)) * 100 : 0 });
+      }
+    }
+
+    return {
+      hasDatetimes: true,
+      multiYear: markers.length > 1,
+      yearMarkers: markers.length > 1 ? markers : [],
+    };
+  }, [snapshots]);
+
   if (!open) return null;
+
+  const startLabel = hasDatetimes ? formatSnapLabel(snapshotStart, snapshots, multiYear) : null;
+  const endLabel   = hasDatetimes ? formatSnapLabel(snapshotEnd,   snapshots, multiYear) : null;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -63,19 +127,32 @@ export function RunDialog({
           </div>
         ) : (
           <>
-            <div className="field" style={{ marginBottom: 16 }}>
+            <div className="field" style={{ marginBottom: yearMarkers.length ? 4 : 16 }}>
               <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>
                 Simulation window — <strong>{snapshotEnd - snapshotStart} hourly steps</strong>
-                {' '}(step {snapshotStart} → {snapshotEnd} of {maxSnapshots})
+                {' '}
+                {hasDatetimes
+                  ? <span>({startLabel} → {endLabel})</span>
+                  : <span>(step {snapshotStart} → {snapshotEnd} of {maxSnapshots})</span>
+                }
               </span>
               <DualRangeSlider
                 min={0}
                 max={maxSnapshots}
                 low={snapshotStart}
                 high={snapshotEnd}
-                formatLabel={(v) => `${v}`}
+                formatLabel={(v) => formatSnapLabel(v, snapshots, multiYear)}
                 onChange={(lo, hi) => { onSnapshotStartChange(lo); onSnapshotEndChange(hi); }}
               />
+              {yearMarkers.length > 0 && (
+                <div className="snap-year-track">
+                  {yearMarkers.map(({ year, pct }) => (
+                    <span key={year} className="snap-year-chip" style={{ left: `${pct}%` }}>
+                      {year}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="field" style={{ marginBottom: 8 }}>

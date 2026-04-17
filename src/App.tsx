@@ -9,6 +9,7 @@ import {
   GridRow,
   MetricOption,
   Primitive,
+  RunHistoryEntry,
   RunResults,
   SheetName,
   TimeSeriesRow,
@@ -47,6 +48,9 @@ function AppInner() {
   const [chartSections, setChartSections] = useState<ChartSectionConfig[]>([]);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [dryRun, setDryRun] = useState(false);
+  const [runHistory, setRunHistory] = useState<RunHistoryEntry[]>([]);
+  const [runCount, setRunCount] = useState(0);
+  const MAX_UNPINNED = 5;
   const [validateResult, setValidateResult] = useState<{
     valid: boolean;
     errors: string[];
@@ -175,6 +179,30 @@ function AppInner() {
     setStatus(`Added column "${col}" to ${sheet}.`);
   };
 
+  const handleRestoreRun = (entry: RunHistoryEntry) => {
+    setResults(entry.results);
+    setTab('Analytics');
+    setAnalyticsFocus({ type: 'system' });
+    showToast(`Viewing ${entry.label}`, 'success');
+  };
+
+  const handleRenameHistoryEntry = (id: string, label: string) => {
+    setRunHistory((h) => h.map((e) => (e.id === id ? { ...e, label } : e)));
+  };
+
+  const handlePinHistoryEntry = (id: string, pinned: boolean) => {
+    setRunHistory((h) => {
+      const updated = h.map((e) => (e.id === id ? { ...e, pinned } : e));
+      const pinnedEntries = updated.filter((e) => e.pinned);
+      const unpinnedEntries = updated.filter((e) => !e.pinned).slice(0, MAX_UNPINNED);
+      return [...pinnedEntries, ...unpinnedEntries];
+    });
+  };
+
+  const handleDeleteHistoryEntry = (id: string) => {
+    setRunHistory((h) => h.filter((e) => e.id !== id));
+  };
+
   const handleImportTsSheet = (sheet: TsSheetName, rows: GridRow[]) => {
     setModel((current) => ({ ...current, [sheet]: rows }));
     if (rows.length > 0) {
@@ -281,6 +309,36 @@ function AppInner() {
       const doneMsg = `Completed — ${nextResults.runMeta.snapshotCount} snapshots, ${nextResults.runMeta.modeledHours} h.`;
       setStatus(doneMsg);
       showToast(doneMsg, 'success');
+      setRunCount((n) => {
+        const next = n + 1;
+        const entry: RunHistoryEntry = {
+          id: Date.now().toString(),
+          label: `Run ${next}`,
+          savedAt: new Date().toISOString(),
+          filename,
+          carbonPrice,
+          snapshotStart,
+          snapshotEnd,
+          snapshotWeight,
+          activeConstraints: constraints.filter((c) => c.enabled),
+          componentCounts: {
+            generators: model.generators.length,
+            buses: model.buses.length,
+            lines: model.lines.length,
+            links: model.links.length,
+            storageUnits: model.storage_units.length,
+          },
+          pinned: false,
+          results: nextResults,
+        };
+        setRunHistory((hist) => {
+          const withNew = [entry, ...hist];
+          const pinned = withNew.filter((e) => e.pinned);
+          const unpinned = withNew.filter((e) => !e.pinned).slice(0, MAX_UNPINNED);
+          return [...pinned, ...unpinned];
+        });
+        return next;
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
       setRunStatus('error');
@@ -463,6 +521,11 @@ function AppInner() {
                 exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
                 showToast('Full model exported to Excel', 'success');
               }}
+              runHistory={runHistory}
+              onRestoreRun={handleRestoreRun}
+              onRenameHistoryEntry={handleRenameHistoryEntry}
+              onPinHistoryEntry={handlePinHistoryEntry}
+              onDeleteHistoryEntry={handleDeleteHistoryEntry}
             />
           )}
         </aside>
@@ -513,6 +576,7 @@ function AppInner() {
                 systemLoadRows={systemLoadRows}
                 systemPriceRows={systemPriceRows}
                 storageRows={storageRows}
+                runHistory={runHistory}
               />
             )
           )}
@@ -529,6 +593,7 @@ function AppInner() {
         snapshotWeight={snapshotWeight}
         carbonPrice={carbonPrice}
         dryRun={dryRun}
+        snapshots={model.snapshots}
         onSnapshotStartChange={setSnapshotStart}
         onSnapshotEndChange={setSnapshotEnd}
         onSnapshotWeightChange={setSnapshotWeight}
