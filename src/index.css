@@ -2752,3 +2752,23 @@ th:hover .col-filter-btn { opacity: 1; }
   cursor: pointer;
 }
 .ems-show-more:hover { background: #f8fafc; color: #2563eb; border-color: #93c5fd; }
+
+/* ── Dashboard expand/collapse all button ────────────────────────────────── */
+.dashboard-toggle-all-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  transition: background 0.15s, color 0.15s;
+}
+.dashboard-toggle-all-btn:hover {
+  background: #e2e8f0;
+  color: var(--text);
+}

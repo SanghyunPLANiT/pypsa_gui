@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../types';
 import { numberValue } from '../../utils/helpers';
 import { exportChartToExcel } from '../../utils/exportChart';
@@ -36,11 +36,19 @@ interface SectionProps {
   title: string;
   defaultOpen?: boolean;
   onExport?: () => void;
+  /** Increment this token to force-open the section from outside */
+  openToken?: number;
+  /** Increment this token to force-collapse the section from outside */
+  closeToken?: number;
   children: React.ReactNode;
 }
 
-function DashboardSection({ title, defaultOpen = false, onExport, children }: SectionProps) {
+function DashboardSection({ title, defaultOpen = true, onExport, openToken, closeToken, children }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => { if (openToken) setOpen(true); }, [openToken]);
+  useEffect(() => { if (closeToken) setOpen(false); }, [closeToken]);
+
   return (
     <div className="dashboard-section">
       <div className="dashboard-section-header-row">
@@ -100,6 +108,16 @@ export function ResultsDashboard({
   storageRows,
 }: Props) {
   const { showToast } = useToast();
+
+  // Expand / collapse all — incrementing token triggers DashboardSection effects
+  const [openToken, setOpenToken] = useState(0);
+  const [closeToken, setCloseToken] = useState(0);
+  const [allCollapsed, setAllCollapsed] = useState(false);
+
+  const toggleAll = () => {
+    if (allCollapsed) { setOpenToken((t) => t + 1); setAllCollapsed(false); }
+    else { setCloseToken((t) => t + 1); setAllCollapsed(true); }
+  };
 
   // Refs for chart containers (used to grab the SVG for export)
   const dispatchRef = useRef<HTMLDivElement>(null);
@@ -197,10 +215,18 @@ export function ResultsDashboard({
         <KpiCard label="RE share" value={`${reShare.toFixed(1)}`} unit="%" green />
         <KpiCard label="Avg price" value={`${avgPrice.toFixed(1)}`} unit="$/MWh" />
         <KpiCard label="Emissions" value={emissionsDisplay} unit="" />
+        <button
+          type="button"
+          className="dashboard-toggle-all-btn"
+          onClick={toggleAll}
+          title={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+        >
+          {allCollapsed ? '▼ Expand all' : '▲ Collapse all'}
+        </button>
       </div>
 
       {/* Dispatch stack */}
-      <DashboardSection title="Generation dispatch" defaultOpen onExport={exportDispatch}>
+      <DashboardSection openToken={openToken} closeToken={closeToken} title="Generation dispatch" defaultOpen onExport={exportDispatch}>
         <div ref={dispatchRef}>
           <InteractiveTimeSeriesCard
             title="Generation dispatch by carrier"
@@ -215,12 +241,12 @@ export function ResultsDashboard({
 
       {/* Energy mix + Cost breakdown side by side */}
       <div className="dashboard-row">
-        <DashboardSection title="Energy mix" onExport={exportEnergyMix}>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Energy mix" onExport={exportEnergyMix}>
           <div ref={energyMixRef}>
             <DonutChart data={results.carrierMix} />
           </div>
         </DashboardSection>
-        <DashboardSection title="Cost breakdown" onExport={exportCostBreakdown}>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Cost breakdown" onExport={exportCostBreakdown}>
           <div ref={costRef}>
             {costMix.length > 0 ? (
               <DonutChart data={costMix} />
@@ -235,12 +261,12 @@ export function ResultsDashboard({
 
       {/* Duration curves side by side */}
       <div className="dashboard-row">
-        <DashboardSection title="Load duration curve" onExport={exportLoadDuration}>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Load duration curve" onExport={exportLoadDuration}>
           <div ref={loadDurRef}>
             <DurationCurveCard title="Load (MW)" data={sortedLoad} unit="MW" color="#f97316" />
           </div>
         </DashboardSection>
-        <DashboardSection title="Price duration curve" onExport={exportPriceDuration}>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Price duration curve" onExport={exportPriceDuration}>
           <div ref={priceDurRef}>
             <DurationCurveCard title="Marginal price ($/MWh)" data={sortedPrice} unit="$/MWh" color="#111827" />
           </div>
@@ -249,7 +275,7 @@ export function ResultsDashboard({
 
       {/* Storage SoC */}
       {hasStorage && (
-        <DashboardSection title="Storage state of charge" onExport={exportStorage}>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Storage state of charge" onExport={exportStorage}>
           <div ref={storageRef}>
             <InteractiveTimeSeriesCard
               title="Storage state of charge"
@@ -265,7 +291,7 @@ export function ResultsDashboard({
 
       {/* Capacity expansion */}
       {results.expansionResults && results.expansionResults.length > 0 && (
-        <DashboardSection title="Capacity expansion results" defaultOpen>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Capacity expansion results" defaultOpen>
           <CapacityExpansionCard assets={results.expansionResults} />
         </DashboardSection>
       )}
@@ -274,20 +300,20 @@ export function ResultsDashboard({
       {results.emissionsBreakdown && (
         results.emissionsBreakdown.byCarrier.length > 0 || results.emissionsBreakdown.byGenerator.length > 0
       ) && (
-        <DashboardSection title="Emissions by generator / carrier" defaultOpen>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Emissions by generator / carrier" defaultOpen>
           <EmissionsBreakdownCard data={results.emissionsBreakdown} />
         </DashboardSection>
       )}
 
       {/* Market analysis row — merit order + CO₂ shadow price */}
       <div className="dashboard-row">
-        <DashboardSection title="Merit order (supply stack)" defaultOpen>
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="Merit order (supply stack)" defaultOpen>
           <MeritOrderCard
             entries={results.meritOrder ?? []}
             systemLoad={peakLoad}
           />
         </DashboardSection>
-        <DashboardSection title="CO₂ constraint shadow price">
+        <DashboardSection openToken={openToken} closeToken={closeToken} title="CO₂ constraint shadow price">
           <Co2ShadowCard shadow={results.co2Shadow ?? {
             found: false,
             constraint_name: null,
