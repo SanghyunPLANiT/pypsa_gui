@@ -2328,6 +2328,28 @@ path.leaflet-interactive:focus {
 /* Row-number column body cells stay above horizontally-scrolled data */
 .spreadsheet-table tbody .rn-col { z-index: 1; }
 
+/* Frozen first data column (name / snapshot) */
+.spreadsheet-table thead .col-frozen {
+  position: sticky;
+  left: 40px;   /* width of .rn-col */
+  z-index: 3;
+  background: #f1f5f9;
+  border-right: 2px solid #cbd5e1 !important;
+  font-weight: 600;
+}
+.spreadsheet-table tbody .col-frozen {
+  position: sticky;
+  left: 40px;
+  z-index: 1;
+  background: #f8fafc;
+  border-right: 2px solid #e2e8f0 !important;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.spreadsheet-table tbody tr:hover .col-frozen {
+  background: #eff6ff;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    Column filter (Excel-style)
    ══════════════════════════════════════════════════════════════════════════ */

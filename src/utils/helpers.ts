@@ -47,7 +47,26 @@ export function inferInputValue(raw: string, current: Primitive): Primitive {
 export function getColumns(rows: GridRow[], sheet: SheetName): string[] {
   const ordered = new Set<string>(Object.keys(DEFAULT_SHEET_ROWS[sheet]));
   rows.forEach((row) => Object.keys(row).forEach((key) => ordered.add(key)));
-  return Array.from(ordered);
+  const cols = Array.from(ordered);
+  // Pin 'name' as the first data column on every static sheet
+  const nameIdx = cols.indexOf('name');
+  if (nameIdx > 0) {
+    cols.splice(nameIdx, 1);
+    cols.unshift('name');
+  }
+  return cols;
+}
+
+/** For temporal (_t) sheets the first column is the snapshot/timestamp key. */
+export function getTsFirstCol(rows: GridRow[]): string {
+  if (!rows.length) return 'snapshot';
+  const keys = Object.keys(rows[0]);
+  // Prefer explicit timestamp-like names; fall back to the very first key
+  return (
+    keys.find((k) => ['snapshot', 'datetime', 'timestamp', 'time'].includes(k.toLowerCase())) ??
+    keys[0] ??
+    'snapshot'
+  );
 }
 
 export function carrierColor(carrier: string): string {
