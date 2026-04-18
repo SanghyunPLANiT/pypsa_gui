@@ -46,10 +46,14 @@ function firstNumericSummary(entry: RunHistoryEntry, predicate: (label: string) 
 interface Props {
   runHistory: RunHistoryEntry[];
   activeResults: RunResults | null;
+  onToggleComparison: (id: string, inComparison: boolean) => void;
 }
 
-export function ComparisonPane({ runHistory, activeResults }: Props) {
-  if (runHistory.length < 2) {
+export function ComparisonPane({ runHistory, activeResults, onToggleComparison }: Props) {
+  // Only show runs the user has opted into comparison
+  const included = runHistory.filter((e) => e.inComparison);
+
+  if (included.length < 2) {
     return (
       <div className="analytics-empty">
         <h3>No runs to compare yet</h3>
@@ -63,14 +67,14 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
 
   // ── KPI bar data ────────────────────────────────────────────────────────────
 
-  const dispatchEntries: BarEntry[] = runHistory.map((e) => ({
+  const dispatchEntries: BarEntry[] = included.map((e) => ({
     id: e.id,
     label: e.label,
     value: e.results.carrierMix.reduce((s, m) => s + m.value, 0) / 1000,
     active: e.results === activeResults,
   }));
 
-  const reEntries: BarEntry[] = runHistory.map((e) => {
+  const reEntries: BarEntry[] = included.map((e) => {
     const total = e.results.carrierMix.reduce((s, m) => s + m.value, 0);
     const re = e.results.carrierMix
       .filter((m) => RE_CARRIERS.has(m.label))
@@ -78,21 +82,21 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
     return { id: e.id, label: e.label, value: total > 0 ? (re / total) * 100 : 0, active: e.results === activeResults };
   });
 
-  const emissionsEntries: BarEntry[] = runHistory.map((e) => ({
+  const emissionsEntries: BarEntry[] = included.map((e) => ({
     id: e.id,
     label: e.label,
     value: firstNumericSummary(e, (l) => l.toLowerCase().includes('emission')),
     active: e.results === activeResults,
   }));
 
-  const priceEntries: BarEntry[] = runHistory.map((e) => ({
+  const priceEntries: BarEntry[] = included.map((e) => ({
     id: e.id,
     label: e.label,
     value: firstNumericSummary(e, (l) => l.toLowerCase().includes('price')),
     active: e.results === activeResults,
   }));
 
-  const showKpiCharts = runHistory.some((e) => e.results.carrierMix.length > 0);
+  const showKpiCharts = included.some((e) => e.results.carrierMix.length > 0);
 
   return (
     <div className="results-dashboard">
@@ -109,8 +113,9 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
 
       {/* ── Comparison table ──────────────────────────────────────────────── */}
       <RunComparisonTable
-        runHistory={runHistory}
-        activeResults={activeResults ?? runHistory[0].results}
+        runHistory={included}
+        activeResults={activeResults ?? included[0].results}
+        onToggleComparison={onToggleComparison}
       />
     </div>
   );

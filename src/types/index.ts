@@ -264,6 +264,7 @@ export interface RunHistoryEntry {
     storageUnits: number;
   };
   pinned: boolean;
+  inComparison: boolean;   // false = excluded from Comparison tab, still in history
   results: RunResults;
 }
 

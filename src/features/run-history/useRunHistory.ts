@@ -71,6 +71,7 @@ export function useRunHistory() {
           storageUnits: model.storage_units.length,
         },
         pinned: false,
+        inComparison: true,
         results,
       };
       setRunHistory((hist) => {

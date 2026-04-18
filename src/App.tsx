@@ -233,6 +233,10 @@ function AppInner() {
     setRunHistory((h) => h.filter((e) => e.id !== id));
   };
 
+  const handleToggleComparison = (id: string, inComparison: boolean) => {
+    setRunHistory((h) => h.map((e) => (e.id === id ? { ...e, inComparison } : e)));
+  };
+
   const handleImportTsSheet = (sheet: TsSheetName, rows: GridRow[]) => {
     setModel((current) => ({ ...current, [sheet]: rows }));
     if (rows.length > 0) {
@@ -363,6 +367,7 @@ function AppInner() {
             storageUnits: model.storage_units.length,
           },
           pinned: false,
+          inComparison: true,
           results: nextResults,
         };
         setRunHistory((hist) => {
@@ -505,6 +510,7 @@ function AppInner() {
               onRenameHistoryEntry={handleRenameHistoryEntry}
               onPinHistoryEntry={handlePinHistoryEntry}
               onDeleteHistoryEntry={handleDeleteHistoryEntry}
+              onToggleComparison={handleToggleComparison}
             />
           )}
         </aside>
@@ -594,7 +600,7 @@ function AppInner() {
               )}
 
               {analyticsSubTab === 'Comparison' && (
-                <ComparisonPane runHistory={runHistory} activeResults={results} />
+                <ComparisonPane runHistory={runHistory} activeResults={results} onToggleComparison={handleToggleComparison} />
               )}
 
               {(analyticsSubTab === 'Result' || analyticsSubTab === 'Analytics') && (

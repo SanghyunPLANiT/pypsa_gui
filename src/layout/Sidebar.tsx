@@ -29,6 +29,7 @@ export interface SidebarProps {
   onRenameHistoryEntry: (id: string, label: string) => void;
   onPinHistoryEntry: (id: string, pinned: boolean) => void;
   onDeleteHistoryEntry: (id: string) => void;
+  onToggleComparison: (id: string, inComparison: boolean) => void;
 }
 
 export function Sidebar({
@@ -46,6 +47,7 @@ export function Sidebar({
   onRenameHistoryEntry,
   onPinHistoryEntry,
   onDeleteHistoryEntry,
+  onToggleComparison,
 }: SidebarProps) {
   const carriers = Array.from(
     new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)),
@@ -112,6 +114,7 @@ export function Sidebar({
             onRenameHistoryEntry={onRenameHistoryEntry}
             onPinHistoryEntry={onPinHistoryEntry}
             onDeleteHistoryEntry={onDeleteHistoryEntry}
+            onToggleComparison={onToggleComparison}
           />
           <p className="hist-footnote">
             Last {MAX_UNPINNED} runs kept · pin 📌 to preserve

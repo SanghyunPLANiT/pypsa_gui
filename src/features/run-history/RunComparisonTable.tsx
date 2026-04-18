@@ -5,6 +5,7 @@ import { formatRelTime } from '../../shared/utils/formatRelTime';
 interface RunComparisonTableProps {
   runHistory: RunHistoryEntry[];
   activeResults: RunResults;
+  onToggleComparison?: (id: string, inComparison: boolean) => void;
 }
 
 /** Strip units/commas and return the first numeric token, or null. */
@@ -23,7 +24,7 @@ function delta(base: number, target: number): { text: string; dir: 'up' | 'down'
   return { text: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`, dir: pct > 0 ? 'up' : 'down' };
 }
 
-export function RunComparisonTable({ runHistory, activeResults }: RunComparisonTableProps) {
+export function RunComparisonTable({ runHistory, activeResults, onToggleComparison }: RunComparisonTableProps) {
   if (runHistory.length < 2) return null;
 
   // Newest run first
@@ -56,7 +57,18 @@ export function RunComparisonTable({ runHistory, activeResults }: RunComparisonT
                 key={entry.id}
                 className={`cmp-th${i === activeIdx ? ' cmp-col--active' : ''}`}
               >
-                <div className="cmp-th-label">{entry.label}</div>
+                <div className="cmp-th-top">
+                  <div className="cmp-th-label">{entry.label}</div>
+                  {onToggleComparison && (
+                    <button
+                      className="cmp-col-remove"
+                      title="Remove from comparison (keeps run in history)"
+                      onClick={() => onToggleComparison(entry.id, false)}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
                 <div className="cmp-th-meta">
                   {formatRelTime(entry.savedAt)}
                   {i === activeIdx && <span className="cmp-active-badge">active</span>}

@@ -8,33 +8,32 @@ export interface RunHistoryCardProps {
   onRename: (label: string) => void;
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
+  onToggleComparison: (inComparison: boolean) => void;
 }
 
-export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: RunHistoryCardProps) {
+export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete, onToggleComparison }: RunHistoryCardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.label);
+  const [confirming, setConfirming] = useState(false);
 
   const commitRename = () => {
     onRename(draft.trim() || entry.label);
     setEditing(false);
   };
 
-  // Show system emissions (index 4) and peak price (index 3) as quick KPIs
   const kpiEmissions = entry.results.summary[4];
   const kpiPrice = entry.results.summary[3];
 
   return (
-    <div className={`hist-card${entry.pinned ? ' hist-card--pinned' : ''}`}>
+    <div className={`hist-card${entry.pinned ? ' hist-card--pinned' : ''}${!entry.inComparison ? ' hist-card--excluded' : ''}`}>
       <div className="hist-card-header">
 
-        {/* Compare checkbox — unchecking removes the run from history */}
-        <label className="hist-compare-check" title="Include in comparison (uncheck to remove)">
+        {/* Comparison checkbox */}
+        <label className="hist-compare-check" title={entry.inComparison ? 'Included in Comparison tab — uncheck to exclude' : 'Excluded from Comparison tab — check to include'}>
           <input
             type="checkbox"
-            defaultChecked
-            onChange={(e) => {
-              if (!e.target.checked) onDelete();
-            }}
+            checked={entry.inComparison}
+            onChange={(e) => onToggleComparison(e.target.checked)}
           />
         </label>
 
@@ -59,16 +58,13 @@ export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: Run
           </span>
         )}
 
-        <div className="hist-card-actions">
-          <button
-            className={`hist-pin-btn${entry.pinned ? ' active' : ''}`}
-            title={entry.pinned ? 'Unpin' : "Pin — won't auto-expire"}
-            onClick={() => onPin(!entry.pinned)}
-          >
-            📌
-          </button>
-          <button className="hist-delete-btn" title="Delete" onClick={onDelete}>✕</button>
-        </div>
+        <button
+          className={`hist-pin-btn${entry.pinned ? ' active' : ''}`}
+          title={entry.pinned ? 'Unpin' : "Pin — won't auto-expire"}
+          onClick={() => onPin(!entry.pinned)}
+        >
+          📌
+        </button>
       </div>
 
       <div className="hist-meta">
@@ -103,9 +99,23 @@ export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: Run
         </div>
       )}
 
-      <button className="ghost-button sm hist-view-btn" onClick={onView}>
-        View results →
-      </button>
+      <div className="hist-card-footer">
+        <button className="ghost-button sm hist-view-btn" onClick={onView}>
+          View results →
+        </button>
+
+        {confirming ? (
+          <div className="hist-confirm-row">
+            <span className="hist-confirm-label">Delete?</span>
+            <button className="hist-confirm-yes" onClick={() => { setConfirming(false); onDelete(); }}>Yes</button>
+            <button className="hist-confirm-no" onClick={() => setConfirming(false)}>No</button>
+          </div>
+        ) : (
+          <button className="hist-delete-btn" onClick={() => setConfirming(true)}>
+            Delete
+          </button>
+        )}
+      </div>
     </div>
   );
 }

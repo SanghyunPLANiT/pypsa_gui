@@ -8,6 +8,7 @@ interface RunHistoryListProps {
   onRenameHistoryEntry: (id: string, label: string) => void;
   onPinHistoryEntry: (id: string, pinned: boolean) => void;
   onDeleteHistoryEntry: (id: string) => void;
+  onToggleComparison: (id: string, inComparison: boolean) => void;
 }
 
 export function RunHistoryList({
@@ -16,6 +17,7 @@ export function RunHistoryList({
   onRenameHistoryEntry,
   onPinHistoryEntry,
   onDeleteHistoryEntry,
+  onToggleComparison,
 }: RunHistoryListProps) {
   return (
     <div className="hist-list">
@@ -27,6 +29,7 @@ export function RunHistoryList({
           onRename={(label) => onRenameHistoryEntry(entry.id, label)}
           onPin={(pinned) => onPinHistoryEntry(entry.id, pinned)}
           onDelete={() => onDeleteHistoryEntry(entry.id)}
+          onToggleComparison={(v) => onToggleComparison(entry.id, v)}
         />
       ))}
     </div>
