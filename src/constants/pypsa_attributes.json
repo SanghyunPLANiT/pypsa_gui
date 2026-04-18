@@ -101,5 +101,20 @@
   "shunt_impedances": [
     { "col": "g",                "label": "Conductance",             "type": "number",  "default": 0,       "unit": "pu",      "desc": "Shunt conductance (active power consumption)" },
     { "col": "b",                "label": "Susceptance",             "type": "number",  "default": 0.01,    "unit": "pu",      "desc": "Shunt susceptance (reactive power compensation)" }
+  ],
+
+  "processes": [
+    { "col": "bus2",             "label": "Bus 2 (secondary output)", "type": "string",  "default": "",                         "desc": "Second output bus — e.g. heat output of a CHP process" },
+    { "col": "bus3",             "label": "Bus 3 (tertiary output)",  "type": "string",  "default": "",                         "desc": "Third output bus" },
+    { "col": "efficiency2",      "label": "Efficiency 2",             "type": "number",  "default": 1.0,                        "desc": "Conversion efficiency (rate) to bus2" },
+    { "col": "efficiency3",      "label": "Efficiency 3",             "type": "number",  "default": 1.0,                        "desc": "Conversion efficiency (rate) to bus3" },
+    { "col": "p_nom_extendable", "label": "Extendable",               "type": "boolean", "default": false,                      "desc": "Allow PyPSA to optimise process capacity" },
+    { "col": "p_nom_max",        "label": "Max buildable capacity",   "type": "number",  "default": 10000,   "unit": "MW",      "desc": "Upper bound on p_nom_opt when extendable" },
+    { "col": "ramp_limit_up",    "label": "Ramp up limit",            "type": "number",  "default": 1.0,     "unit": "pu/h",    "desc": "Max increase in output per hour as fraction of p_nom" },
+    { "col": "ramp_limit_down",  "label": "Ramp down limit",          "type": "number",  "default": 1.0,     "unit": "pu/h",    "desc": "Max decrease in output per hour as fraction of p_nom" },
+    { "col": "committable",      "label": "Committable (MIP)",        "type": "boolean", "default": false,                      "desc": "Enable unit commitment binary variables" },
+    { "col": "min_up_time",      "label": "Min up time",              "type": "number",  "default": 0,       "unit": "h",       "desc": "Minimum consecutive hours the process must stay on" },
+    { "col": "min_down_time",    "label": "Min down time",            "type": "number",  "default": 0,       "unit": "h",       "desc": "Minimum consecutive hours the process must stay off" },
+    { "col": "build_year",       "label": "Build year",               "type": "number",  "default": 2025,    "unit": "yr",      "desc": "Year the process is commissioned" }
   ]
 }
