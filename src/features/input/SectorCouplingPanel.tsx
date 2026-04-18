@@ -36,7 +36,7 @@ export function SectorCouplingPanel({ busNames, onInsert }: Props) {
   if (!panelOpen) {
     return (
       <button className="sc-panel-collapsed" onClick={() => setPanelOpen(true)}>
-        ⚡ Sector Coupling Templates
+        Sector Coupling Templates
         <span className="sc-panel-collapsed-hint">click to expand</span>
       </button>
     );
@@ -45,7 +45,7 @@ export function SectorCouplingPanel({ busNames, onInsert }: Props) {
   return (
     <div className="sc-panel">
       <div className="sc-panel-header">
-        <span className="sc-panel-title">⚡ Sector Coupling Templates</span>
+        <span className="sc-panel-title">Sector Coupling Templates</span>
         <span className="sc-panel-hint">
           Inserts pre-configured carriers, buses, loads and links
         </span>
@@ -60,7 +60,6 @@ export function SectorCouplingPanel({ busNames, onInsert }: Props) {
           return (
             <div key={bundle.id} className="sc-card">
               <div className="sc-card-header" onClick={() => setCard(bundle.id, { open: !card.open })}>
-                <span className="sc-card-icon">{bundle.icon}</span>
                 <div className="sc-card-meta">
                   <div className="sc-card-label">{bundle.label}</div>
                   <div className="sc-card-desc">{bundle.description}</div>

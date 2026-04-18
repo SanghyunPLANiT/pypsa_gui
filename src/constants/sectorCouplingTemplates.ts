@@ -15,7 +15,6 @@ import { GridRow } from '../types';
 export interface SectorBundle {
   id: string;
   label: string;
-  icon: string;
   description: string;
   carriers: GridRow[];
   buses: GridRow[];
@@ -28,7 +27,6 @@ export const SECTOR_BUNDLES: SectorBundle[] = [
   {
     id: 'pth',
     label: 'Power → Heat',
-    icon: '🔥',
     description:
       'Electric boiler (η 0.99) + Heat pump (COP 3.0). Adds a heat bus and a heat load.',
     carriers: [
@@ -72,7 +70,6 @@ export const SECTOR_BUNDLES: SectorBundle[] = [
   {
     id: 'pth2',
     label: 'Power → H₂',
-    icon: '⚗️',
     description:
       'Electrolyzer (η 0.70) + Fuel cell (η 0.50). Adds an H₂ bus and an H₂ load.',
     carriers: [
@@ -116,7 +113,6 @@ export const SECTOR_BUNDLES: SectorBundle[] = [
   {
     id: 'ptev',
     label: 'Power → EV',
-    icon: '🚗',
     description:
       'EV charging (η 0.90) + V2G discharge (η 0.85). Adds an EV bus and an EV load.',
     carriers: [

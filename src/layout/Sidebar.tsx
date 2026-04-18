@@ -57,13 +57,13 @@ export function Sidebar({
 
   return (
     <>
-      <SidebarGroup title="File" icon="📁" defaultOpen>
+      <SidebarGroup title="File" defaultOpen>
         <div className="sg-btn-grid">
           <button className="tb-btn sg-full" onClick={onOpen}>Open</button>
           <button className="tb-btn sg-full" onClick={onSave}>Save</button>
           <button className="tb-btn sg-full" onClick={onSaveAs}>Save As</button>
           <button className="tb-btn tb-btn--muted sg-full" onClick={onDemo}>Demo</button>
-          <button className="tb-btn tb-btn--muted sg-full" onClick={onSCDemo} title="Load a sector coupling example with Power→Heat, Power→H₂, and Power→EV">⚡ SC Demo</button>
+          <button className="tb-btn tb-btn--muted sg-full" onClick={onSCDemo} title="Load a sector coupling example with Power→Heat, Power→H₂, and Power→EV">SC Demo</button>
           <button
             className="tb-btn sg-full"
             disabled={!results}
@@ -77,7 +77,6 @@ export function Sidebar({
 
       <SidebarGroup
         title="Constraints"
-        icon="⛓"
         badge={
           constraints.filter((c) => c.enabled).length > 0
             ? <span className="sg-badge">{constraints.filter((c) => c.enabled).length}</span>
@@ -92,7 +91,7 @@ export function Sidebar({
       </SidebarGroup>
 
       {results && (
-        <SidebarGroup title="Results" icon="📊" defaultOpen>
+        <SidebarGroup title="Results" defaultOpen>
           <div className="sg-summary">
             {results.summary.map((s) => (
               <div key={s.label} className="sg-summary-item">
@@ -108,7 +107,6 @@ export function Sidebar({
       {runHistory.length > 0 && (
         <SidebarGroup
           title="History"
-          icon="🕓"
           badge={<span className="sg-badge">{runHistory.length}</span>}
         >
           <RunHistoryList
@@ -120,7 +118,7 @@ export function Sidebar({
             onToggleComparison={onToggleComparison}
           />
           <p className="hist-footnote">
-            Last {MAX_UNPINNED} runs kept · pin 📌 to preserve
+            Last {MAX_UNPINNED} runs kept · pin to preserve
           </p>
         </SidebarGroup>
       )}
