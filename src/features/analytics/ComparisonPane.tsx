@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { RunHistoryEntry, RunResults } from '../../shared/types';
 import { RunComparisonTable } from '../run-history/RunComparisonTable';
 
@@ -49,36 +49,13 @@ interface Props {
 }
 
 export function ComparisonPane({ runHistory, activeResults }: Props) {
-  // Store which run IDs are hidden; default = none (show all)
-  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
-
-  const filteredHistory = useMemo(
-    () => runHistory.filter((e) => !excludedIds.has(e.id)),
-    [runHistory, excludedIds],
-  );
-
-  const toggleId = (id: string) => {
-    setExcludedIds((prev) => {
-      // Don't allow dropping below 2 visible runs
-      const wouldBeVisible = runHistory.filter((e) => {
-        const nextExcluded = new Set(prev);
-        nextExcluded.has(id) ? nextExcluded.delete(id) : nextExcluded.add(id);
-        return !nextExcluded.has(e.id);
-      });
-      if (wouldBeVisible.length < 2) return prev;
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
   if (runHistory.length < 2) {
     return (
       <div className="analytics-empty">
         <h3>No runs to compare yet</h3>
         <p>
-          Run the model at least twice — with different settings, carbon prices, or
-          constraints — and the comparison table will appear here automatically.
+          Run the model at least twice. Use the checkboxes in the run history sidebar
+          to control which runs appear here — unchecking a run removes it from history.
         </p>
       </div>
     );
@@ -86,14 +63,14 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
 
   // ── KPI bar data ────────────────────────────────────────────────────────────
 
-  const dispatchEntries: BarEntry[] = filteredHistory.map((e) => ({
+  const dispatchEntries: BarEntry[] = runHistory.map((e) => ({
     id: e.id,
     label: e.label,
-    value: e.results.carrierMix.reduce((s, m) => s + m.value, 0) / 1000, // GWh
+    value: e.results.carrierMix.reduce((s, m) => s + m.value, 0) / 1000,
     active: e.results === activeResults,
   }));
 
-  const reEntries: BarEntry[] = filteredHistory.map((e) => {
+  const reEntries: BarEntry[] = runHistory.map((e) => {
     const total = e.results.carrierMix.reduce((s, m) => s + m.value, 0);
     const re = e.results.carrierMix
       .filter((m) => RE_CARRIERS.has(m.label))
@@ -101,40 +78,24 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
     return { id: e.id, label: e.label, value: total > 0 ? (re / total) * 100 : 0, active: e.results === activeResults };
   });
 
-  const emissionsEntries: BarEntry[] = filteredHistory.map((e) => ({
+  const emissionsEntries: BarEntry[] = runHistory.map((e) => ({
     id: e.id,
     label: e.label,
     value: firstNumericSummary(e, (l) => l.toLowerCase().includes('emission')),
     active: e.results === activeResults,
   }));
 
-  const priceEntries: BarEntry[] = filteredHistory.map((e) => ({
+  const priceEntries: BarEntry[] = runHistory.map((e) => ({
     id: e.id,
     label: e.label,
     value: firstNumericSummary(e, (l) => l.toLowerCase().includes('price')),
     active: e.results === activeResults,
   }));
 
-  const showKpiCharts = filteredHistory.some((e) => e.results.carrierMix.length > 0);
+  const showKpiCharts = runHistory.some((e) => e.results.carrierMix.length > 0);
 
   return (
     <div className="results-dashboard">
-
-      {/* ── Run selector ─────────────────────────────────────────────────── */}
-      <div className="cmp-run-selector">
-        <span className="cmp-run-selector-label">Include runs</span>
-        <div className="cmp-run-pills">
-          {runHistory.map((e) => (
-            <button
-              key={e.id}
-              className={`asset-pill${!excludedIds.has(e.id) ? ' asset-pill--active' : ''}`}
-              onClick={() => toggleId(e.id)}
-            >
-              {e.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* ── KPI bar charts ────────────────────────────────────────────────── */}
       {showKpiCharts && (
@@ -146,15 +107,11 @@ export function ComparisonPane({ runHistory, activeResults }: Props) {
         </div>
       )}
 
-      {/* ── Table ─────────────────────────────────────────────────────────── */}
-      {filteredHistory.length >= 2 ? (
-        <RunComparisonTable
-          runHistory={filteredHistory}
-          activeResults={activeResults ?? filteredHistory[0].results}
-        />
-      ) : (
-        <p className="cmp-need-two">Select at least 2 runs above to see the comparison table.</p>
-      )}
+      {/* ── Comparison table ──────────────────────────────────────────────── */}
+      <RunComparisonTable
+        runHistory={runHistory}
+        activeResults={activeResults ?? runHistory[0].results}
+      />
     </div>
   );
 }

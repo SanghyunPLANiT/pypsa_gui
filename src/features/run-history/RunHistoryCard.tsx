@@ -26,6 +26,18 @@ export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: Run
   return (
     <div className={`hist-card${entry.pinned ? ' hist-card--pinned' : ''}`}>
       <div className="hist-card-header">
+
+        {/* Compare checkbox — unchecking removes the run from history */}
+        <label className="hist-compare-check" title="Include in comparison (uncheck to remove)">
+          <input
+            type="checkbox"
+            defaultChecked
+            onChange={(e) => {
+              if (!e.target.checked) onDelete();
+            }}
+          />
+        </label>
+
         {editing ? (
           <input
             className="hist-label-input"
@@ -46,6 +58,7 @@ export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: Run
             {entry.label}
           </span>
         )}
+
         <div className="hist-card-actions">
           <button
             className={`hist-pin-btn${entry.pinned ? ' active' : ''}`}

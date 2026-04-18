@@ -1712,6 +1712,20 @@ path.leaflet-interactive:focus {
   gap: 6px;
 }
 
+/* Compare checkbox in history card */
+.hist-compare-check {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.hist-compare-check input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
 .hist-label {
   font-size: 0.82rem;
   font-weight: 600;
