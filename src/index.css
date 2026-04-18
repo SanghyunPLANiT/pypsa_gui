@@ -3016,6 +3016,91 @@ th:hover .col-filter-btn { opacity: 1; }
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 
+/* ── Comparison pane — run selector ─────────────────────────────────────── */
+.cmp-run-selector {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.cmp-run-selector-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.cmp-run-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── KPI bar charts ──────────────────────────────────────────────────────── */
+.cmp-bar-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cmp-bar-chart {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.cmp-bar-chart-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.cmp-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.cmp-bar-label {
+  width: 80px;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.cmp-bar-track {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cmp-bar-fill {
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.cmp-bar-fill--active {
+  background: #2563eb;
+}
+.cmp-bar-value {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+}
+
 /* ── Run comparison table ────────────────────────────────────────────────── */
 .cmp-table-wrap {
   overflow-x: auto;
@@ -3035,10 +3120,35 @@ th:hover .col-filter-btn { opacity: 1; }
   text-align: left;
   background: #f8fafc;
 }
+.cmp-th-label {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.cmp-th-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.cmp-active-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #2563eb;
+  background: rgba(37,99,235,0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
 .cmp-table td {
   padding: 6px 12px;
   border-bottom: 1px solid #f1f5f9;
   white-space: nowrap;
+  vertical-align: top;
 }
 .cmp-table .cmp-row-label {
   font-size: 0.78rem;
@@ -3058,8 +3168,24 @@ th:hover .col-filter-btn { opacity: 1; }
 .cmp-col--active {
   background: rgba(37, 99, 235, 0.04) !important;
 }
-.cmp-th.cmp-col--active {
-  color: var(--brand) !important;
+.cmp-th.cmp-col--active .cmp-th-label {
+  color: var(--brand);
+}
+.cmp-cell-main {
+  font-size: 0.82rem;
+}
+.cmp-delta {
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.cmp-delta--up   { color: #16a34a; }
+.cmp-delta--down { color: #dc2626; }
+.cmp-need-two {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 32px;
 }
 
 /* ── Year markers on snapshot slider ────────────────────────────────────── */

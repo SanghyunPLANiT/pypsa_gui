@@ -7,18 +7,39 @@ interface RunComparisonTableProps {
   activeResults: RunResults;
 }
 
+/** Strip units/commas and return the first numeric token, or null. */
+function parseNum(val: string): number | null {
+  const m = val.replace(/,/g, '').match(/[-+]?[0-9]*\.?[0-9]+/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  return isNaN(n) ? null : n;
+}
+
+/** Compute relative delta of `target` vs `base` as a labelled object. */
+function delta(base: number, target: number): { text: string; dir: 'up' | 'down' | 'same' } {
+  if (Math.abs(base) < 0.001) return { text: '—', dir: 'same' };
+  const pct = ((target - base) / Math.abs(base)) * 100;
+  if (Math.abs(pct) < 0.05) return { text: '±0%', dir: 'same' };
+  return { text: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`, dir: pct > 0 ? 'up' : 'down' };
+}
+
 export function RunComparisonTable({ runHistory, activeResults }: RunComparisonTableProps) {
   if (runHistory.length < 2) return null;
 
-  // Determine which column is the active one (match by reference equality)
-  const activeIdx = runHistory.findIndex((e) => e.results === activeResults);
+  // Newest run first
+  const sorted = [...runHistory].sort(
+    (a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+  );
+  const activeIdx = sorted.findIndex((e) => e.results === activeResults);
 
-  const summaryLabels = runHistory[0].results.summary.map((s) => s.label);
+  const summaryLabels = sorted[0].results.summary.map((s) => s.label);
 
   const settingRows: Array<{ label: string; fn: (e: RunHistoryEntry) => string }> = [
     { label: 'Carbon price',  fn: (e) => e.carbonPrice > 0 ? `$${e.carbonPrice}/t` : '—' },
     { label: 'Window',        fn: (e) => `${e.snapshotStart} → ${e.snapshotEnd}` },
-    { label: 'Resolution',    fn: (e) => `${e.snapshotWeight}h` },
+    { label: 'Resolution',    fn: (e) => `${e.snapshotWeight} h` },
+    { label: 'Generators',    fn: (e) => String(e.componentCounts.generators) },
+    { label: 'Storage units', fn: (e) => String(e.componentCounts.storageUnits) },
     { label: 'Constraints',   fn: (e) => e.activeConstraints.length > 0
         ? e.activeConstraints.map((c) => c.label).join(', ')
         : '—' },
@@ -29,29 +50,30 @@ export function RunComparisonTable({ runHistory, activeResults }: RunComparisonT
       <table className="cmp-table">
         <thead>
           <tr>
-            <th style={{ width: 140 }}></th>
-            {runHistory.map((entry, i) => (
+            <th style={{ width: 160 }} />
+            {sorted.map((entry, i) => (
               <th
                 key={entry.id}
                 className={`cmp-th${i === activeIdx ? ' cmp-col--active' : ''}`}
               >
-                <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{entry.label}</div>
-                <div style={{ fontWeight: 400, fontSize: '0.72rem', marginTop: 2 }}>
+                <div className="cmp-th-label">{entry.label}</div>
+                <div className="cmp-th-meta">
                   {formatRelTime(entry.savedAt)}
+                  {i === activeIdx && <span className="cmp-active-badge">active</span>}
                 </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {/* Settings section header */}
+          {/* ── Settings ── */}
           <tr className="cmp-section-header">
-            <td colSpan={runHistory.length + 1}>Settings</td>
+            <td colSpan={sorted.length + 1}>Settings</td>
           </tr>
           {settingRows.map((row) => (
             <tr key={row.label}>
               <td className="cmp-row-label">{row.label}</td>
-              {runHistory.map((entry, i) => (
+              {sorted.map((entry, i) => (
                 <td key={entry.id} className={i === activeIdx ? 'cmp-col--active' : ''}>
                   {row.fn(entry)}
                 </td>
@@ -59,20 +81,43 @@ export function RunComparisonTable({ runHistory, activeResults }: RunComparisonT
             </tr>
           ))}
 
-          {/* Results section header */}
+          {/* ── Results ── */}
           <tr className="cmp-section-header">
-            <td colSpan={runHistory.length + 1}>Results</td>
+            <td colSpan={sorted.length + 1}>Results</td>
           </tr>
-          {summaryLabels.map((label, si) => (
-            <tr key={label}>
-              <td className="cmp-row-label">{label}</td>
-              {runHistory.map((entry, i) => (
-                <td key={entry.id} className={i === activeIdx ? 'cmp-col--active' : ''}>
-                  {entry.results.summary[si]?.value ?? '—'}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {summaryLabels.map((label, si) => {
+            const vals = sorted.map((e) => e.results.summary[si]?.value ?? '—');
+            const nums = vals.map(parseNum);
+            const activeNum = activeIdx >= 0 ? nums[activeIdx] : null;
+
+            return (
+              <tr key={label}>
+                <td className="cmp-row-label">{label}</td>
+                {sorted.map((entry, i) => {
+                  const isActive = i === activeIdx;
+                  const n = nums[i];
+
+                  // Delta tag for non-active columns
+                  let deltaTag: React.ReactNode = null;
+                  if (!isActive && n !== null && activeNum !== null) {
+                    const d = delta(activeNum, n);
+                    if (d.dir !== 'same') {
+                      deltaTag = (
+                        <span className={`cmp-delta cmp-delta--${d.dir}`}>{d.text}</span>
+                      );
+                    }
+                  }
+
+                  return (
+                    <td key={entry.id} className={isActive ? 'cmp-col--active' : ''}>
+                      <div className="cmp-cell-main">{vals[i]}</div>
+                      {deltaTag}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
