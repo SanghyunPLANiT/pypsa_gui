@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { GridRow, Primitive, SheetName, TableSel, TsSheetName, WorkbookModel } from '../../shared/types';
+import { ModelIssue } from '../validation/useModelIssues';
 import { TABLE_GROUPS } from '../../constants';
 import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes';
 import { getColumns, getTsFirstCol, stringValue } from '../../shared/utils/helpers';
@@ -201,10 +202,26 @@ interface SpreadsheetGridProps {
   frozenCol?: string | null;
   readOnly?: boolean;
   onUpdate?: (rowIndex: number, col: string, val: Primitive) => void;
+  rowIssues?: Map<number, 'error' | 'warning'>;
+  highlightRow?: number | null;
 }
 
-function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate }: SpreadsheetGridProps) {
+function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, rowIssues, highlightRow }: SpreadsheetGridProps) {
   const [editCell, setEditCell] = useState<{ row: number; col: string; val: string } | null>(null);
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+
+  // Scroll highlighted row into view when jumpTo fires
+  useEffect(() => {
+    if (highlightRow == null || !tbodyRef.current) return;
+    // Find the <tr> corresponding to the original row index
+    const rows = tbodyRef.current.querySelectorAll('tr');
+    for (const tr of Array.from(rows)) {
+      if ((tr as HTMLElement).dataset.origIdx === String(highlightRow)) {
+        (tr as HTMLElement).scrollIntoView({ block: 'center', behavior: 'smooth' });
+        break;
+      }
+    }
+  }, [highlightRow]);
   // col → Set of values TO SHOW. Missing key = show all.
   const [colFilters, setColFilters] = useState<Record<string, Set<string>>>({});
   const [openCol, setOpenCol] = useState<string | null>(null);
@@ -321,11 +338,18 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate }: 
             })}
           </tr>
         </thead>
-        <tbody>
+        <tbody ref={tbodyRef}>
           {filteredRows.map((row) => {
             const origIdx = rows.indexOf(row);
+            const issueSeverity = rowIssues?.get(origIdx);
+            const isHighlighted = highlightRow === origIdx;
+            const rowCls = [
+              issueSeverity === 'error' ? 'row-issue--error' : '',
+              issueSeverity === 'warning' ? 'row-issue--warning' : '',
+              isHighlighted ? 'row-jump-highlight' : '',
+            ].filter(Boolean).join(' ') || undefined;
             return (
-              <tr key={origIdx}>
+              <tr key={origIdx} className={rowCls} data-orig-idx={origIdx}>
                 <td className="rn-col">{origIdx + 1}</td>
                 {cols.map((c) => {
                   const isEditing = !readOnly && editCell?.row === origIdx && editCell?.col === c;
@@ -399,10 +423,23 @@ interface TablesPaneProps {
   onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
   onAddColumn: (sheet: SheetName, col: string, defaultValue: string | number | boolean) => void;
   onImportTsSheet: (sheet: TsSheetName, rows: GridRow[]) => void;
+  issues?: ModelIssue[];
+  jumpTo?: { sheet: string; rowIndex: number } | null;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet, issues = [], jumpTo }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
+  const [jumpHighlight, setJumpHighlight] = useState<number | null>(null);
+
+  // When jumpTo changes: switch to the target sheet and flash the row
+  useEffect(() => {
+    if (!jumpTo) return;
+    setSel({ kind: 'static', sheet: jumpTo.sheet as SheetName });
+    setJumpHighlight(jumpTo.rowIndex);
+    // Clear the flash after 2.5 s
+    const t = setTimeout(() => setJumpHighlight(null), 2500);
+    return () => clearTimeout(t);
+  }, [jumpTo]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [navSearch, setNavSearch] = useState('');
   const [addColOpen, setAddColOpen] = useState(false);
@@ -410,6 +447,31 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
   const [showAnalyser, setShowAnalyser] = useState(false);
   const addColBtnRef = useRef<HTMLButtonElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Per-sheet issue counts for nav badges
+  const issueCounts = useMemo(() => {
+    const counts: Record<string, { errors: number; warnings: number }> = {};
+    issues.forEach((issue) => {
+      if (!counts[issue.sheet]) counts[issue.sheet] = { errors: 0, warnings: 0 };
+      if (issue.severity === 'error') counts[issue.sheet].errors++;
+      else counts[issue.sheet].warnings++;
+    });
+    return counts;
+  }, [issues]);
+
+  // Row issue map for the currently visible sheet
+  const rowIssueMap = useMemo(() => {
+    const map = new Map<number, 'error' | 'warning'>();
+    issues
+      .filter((i) => i.sheet === sel.sheet)
+      .forEach((issue) => {
+        const existing = map.get(issue.rowIndex);
+        if (!existing || issue.severity === 'error') {
+          map.set(issue.rowIndex, issue.severity);
+        }
+      });
+    return map;
+  }, [issues, sel.sheet]);
 
   const toggleGroup = (sheet: string) =>
     setCollapsed((s) => {
@@ -519,6 +581,12 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
                     <span className="nav-item-icon">≡</span>
                     <span className="nav-item-label">static</span>
                     <span className="nav-count">{model[g.sheet].length}</span>
+                    {issueCounts[g.sheet]?.errors > 0 && (
+                      <span className="nav-issue-badge nav-issue-badge--error">{issueCounts[g.sheet].errors}</span>
+                    )}
+                    {!issueCounts[g.sheet]?.errors && issueCounts[g.sheet]?.warnings > 0 && (
+                      <span className="nav-issue-badge nav-issue-badge--warning">{issueCounts[g.sheet].warnings}</span>
+                    )}
                   </button>
                   {g.tsSheet && (
                     <button
@@ -655,6 +723,8 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
               onUpdate={
                 isTs ? undefined : (ri, col, val) => onUpdate(sel.sheet as SheetName, ri, col, val)
               }
+              rowIssues={isTs ? undefined : rowIssueMap}
+              highlightRow={isTs ? null : jumpHighlight}
             />
           )}
         </div>

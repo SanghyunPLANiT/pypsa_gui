@@ -29,6 +29,7 @@ import { Sidebar } from './layout/Sidebar';
 import { MapPane } from './features/map/MapPane';
 import { TablesPane } from './features/input/TablesPane';
 import { ValidationPane } from './features/validation/ValidationPane';
+import { useModelIssues } from './features/validation/useModelIssues';
 import { AnalyticsPane, EmptyAnalytics } from './features/analytics/AnalyticsPane';
 import { ComparisonPane } from './features/analytics/ComparisonPane';
 import { ToastProvider, useToast } from './shared/components/Toast';
@@ -65,6 +66,9 @@ function AppInner() {
   } | null>(null);
   const [status, setStatus] = useState('Ready. Open a workbook or try the demo model.');
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
+  const [jumpTo, setJumpTo] = useState<{ sheet: string; rowIndex: number } | null>(null);
+
+  const modelIssues = useModelIssues(model);
   const [filename, setFilename] = useState('ragnarok_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -507,6 +511,8 @@ function AppInner() {
                   onDeleteRow={deleteRow}
                   onAddColumn={addColumn}
                   onImportTsSheet={handleImportTsSheet}
+                  issues={modelIssues}
+                  jumpTo={jumpTo}
                 />
               )}
             </div>
@@ -526,7 +532,12 @@ function AppInner() {
                       onClick={() => setAnalyticsSubTab(s)}
                     >
                       {s}
-                      {s === 'Validation' && validateResult && (
+                      {s === 'Validation' && modelIssues.filter(i => i.severity === 'error').length > 0 && (
+                        <span className="tab-badge tab-badge--error">
+                          {modelIssues.filter(i => i.severity === 'error').length}
+                        </span>
+                      )}
+                      {s === 'Validation' && modelIssues.filter(i => i.severity === 'error').length === 0 && validateResult && (
                         <span className={`tab-badge ${validateResult.valid ? 'tab-badge--ok' : 'tab-badge--error'}`}>
                           {validateResult.valid ? '✓' : validateResult.errors.length + validateResult.warnings.length}
                         </span>
@@ -546,8 +557,14 @@ function AppInner() {
               {analyticsSubTab === 'Validation' && (
                 <ValidationPane
                   validateResult={validateResult}
+                  issues={modelIssues}
                   onValidate={() => { setDryRun(true); setRunDialogOpen(true); }}
                   onRun={() => { setDryRun(false); setRunDialogOpen(true); }}
+                  onNavigate={(sheet, rowIndex) => {
+                    setTab('Model');
+                    setModelSubTab('Table');
+                    setJumpTo({ sheet, rowIndex });
+                  }}
                 />
               )}
 

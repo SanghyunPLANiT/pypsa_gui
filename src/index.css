@@ -3188,6 +3188,90 @@ th:hover .col-filter-btn { opacity: 1; }
   padding: 32px;
 }
 
+/* ── Validation issue list ───────────────────────────────────────────────── */
+.vi-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vi-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  background: #f8fafc;
+  font-size: 0.82rem;
+}
+.vi-item--error  { border-left-color: #dc2626; background: #fef2f2; }
+.vi-item--warning { border-left-color: #f59e0b; background: #fffbeb; }
+.vi-icon {
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.vi-item--error  .vi-icon { color: #dc2626; }
+.vi-item--warning .vi-icon { color: #d97706; }
+.vi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.vi-loc {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.vi-loc:hover { color: #1d4ed8; }
+.vi-msg {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+/* ── Row issue highlights in spreadsheet grid ────────────────────────────── */
+.row-issue--error  > td { background: #fff5f5 !important; }
+.row-issue--warning > td { background: #fffdf0 !important; }
+.row-issue--error  > td:first-child { border-left: 3px solid #dc2626; }
+.row-issue--warning > td:first-child { border-left: 3px solid #f59e0b; }
+.row-jump-highlight > td {
+  background: #eff6ff !important;
+  animation: row-flash 2.5s ease-out forwards;
+}
+@keyframes row-flash {
+  0%   { background: #bfdbfe !important; }
+  100% { background: transparent !important; }
+}
+
+/* ── Nav issue badges ────────────────────────────────────────────────────── */
+.nav-issue-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: auto;
+}
+.nav-issue-badge--error   { background: #fecaca; color: #dc2626; }
+.nav-issue-badge--warning { background: #fde68a; color: #b45309; }
+
 /* ── Map asset detail card ───────────────────────────────────────────────── */
 .map-detail-card {
   position: absolute;
