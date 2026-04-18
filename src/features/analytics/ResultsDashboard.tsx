@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../shared/types';
+import { RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../shared/types';
 import { numberValue } from '../../shared/utils/helpers';
 import { exportChartToExcel } from '../../shared/utils/exportChart';
 import { useToast } from '../../shared/components/Toast';
@@ -10,7 +10,6 @@ import { CapacityExpansionCard } from '../../components/charts/CapacityExpansion
 import { MeritOrderCard } from '../../components/charts/MeritOrderCard';
 import { Co2ShadowCard } from '../../components/charts/Co2ShadowCard';
 import { EmissionsBreakdownCard } from '../../components/charts/EmissionsBreakdownCard';
-import { RunComparisonTable } from '../run-history/RunComparisonTable';
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +90,6 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
-  runHistory: RunHistoryEntry[];
 }
 
 export function ResultsDashboard({
@@ -101,7 +99,6 @@ export function ResultsDashboard({
   systemLoadRows,
   systemPriceRows,
   storageRows,
-  runHistory,
 }: Props) {
   const { showToast } = useToast();
 
@@ -217,6 +214,34 @@ export function ResultsDashboard({
         </div>
       </DashboardSection>
 
+      {/* System load time series */}
+      {systemLoadRows.length > 0 && (
+        <DashboardSection title="System load">
+          <InteractiveTimeSeriesCard
+            title="Total system load"
+            description="Load (MW) over all snapshots"
+            data={systemLoadRows}
+            series={[{ key: 'load', label: 'Load MW', color: '#f97316' }]}
+            mode="area"
+            stacked={false}
+          />
+        </DashboardSection>
+      )}
+
+      {/* System marginal price time series */}
+      {systemPriceRows.length > 0 && (
+        <DashboardSection title="System marginal price">
+          <InteractiveTimeSeriesCard
+            title="System marginal price"
+            description="$/MWh over all snapshots"
+            data={systemPriceRows}
+            series={[{ key: 'price', label: 'SMP $/MWh', color: '#111827' }]}
+            mode="line"
+            stacked={false}
+          />
+        </DashboardSection>
+      )}
+
       {/* Energy mix + Cost breakdown side by side */}
       <div className="dashboard-row">
         <DashboardSection title="Energy mix" onExport={exportEnergyMix}>
@@ -304,12 +329,6 @@ export function ResultsDashboard({
         </DashboardSection>
       </div>
 
-      {/* Run comparison table — shown when there are >= 2 history entries */}
-      {runHistory.length >= 2 && (
-        <DashboardSection title="Run comparison" defaultOpen>
-          <RunComparisonTable runHistory={runHistory} activeResults={results} />
-        </DashboardSection>
-      )}
     </div>
   );
 }

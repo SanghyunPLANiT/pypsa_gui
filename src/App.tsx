@@ -30,6 +30,7 @@ import { MapPane } from './features/map/MapPane';
 import { TablesPane } from './features/input/TablesPane';
 import { ValidationPane } from './features/validation/ValidationPane';
 import { AnalyticsPane, EmptyAnalytics } from './features/analytics/AnalyticsPane';
+import { ComparisonPane } from './features/analytics/ComparisonPane';
 import { ToastProvider, useToast } from './shared/components/Toast';
 
 function AppInner() {
@@ -516,7 +517,7 @@ function AppInner() {
             <div className="pane analytics-outer-pane">
               <div className="pane-header analytics-outer-header">
                 <nav className="subnav">
-                  {(['Validation', 'Result', 'Analytics'] as AnalyticsSubTab[]).map((s) => (
+                  {(['Validation', 'Result', 'Analytics', 'Comparison'] as AnalyticsSubTab[]).map((s) => (
                     <button
                       key={s}
                       className={`subnav-btn${analyticsSubTab === s ? ' subnav-btn--active' : ''}${
@@ -548,6 +549,10 @@ function AppInner() {
                   onValidate={() => { setDryRun(true); setRunDialogOpen(true); }}
                   onRun={() => { setDryRun(false); setRunDialogOpen(true); }}
                 />
+              )}
+
+              {analyticsSubTab === 'Comparison' && (
+                <ComparisonPane runHistory={runHistory} activeResults={results} />
               )}
 
               {(analyticsSubTab === 'Result' || analyticsSubTab === 'Analytics') && (

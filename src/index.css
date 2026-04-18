@@ -2413,6 +2413,13 @@ path.leaflet-interactive:focus {
   font-size: 0.67rem;
   color: var(--muted);
 }
+.smp-gradient-bar {
+  height: 10px;
+  width: 120px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #2563eb, #f1f5f9, #dc2626);
+  margin: 4px 0 2px;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    QW-3  Tables nav search filter

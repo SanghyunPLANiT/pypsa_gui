@@ -77,3 +77,26 @@ export function LoadingLegend({ show }: LoadingLegendProps) {
     </div>
   );
 }
+
+// ── Nodal SMP colour scale legend ─────────────────────────────────────────────
+
+interface SmpLegendProps {
+  show: boolean;
+  min: number;
+  max: number;
+}
+
+export function SmpLegend({ show, min, max }: SmpLegendProps) {
+  if (!show) return null;
+  return (
+    <div className="map-legend loading-legend">
+      <div className="map-legend-title">Avg SMP ($/MWh)</div>
+      <div className="smp-gradient-bar" />
+      <div className="loading-gradient-labels">
+        <span>{min.toFixed(0)}</span>
+        <span>{((min + max) / 2).toFixed(0)}</span>
+        <span>{max.toFixed(0)}</span>
+      </div>
+    </div>
+  );
+}

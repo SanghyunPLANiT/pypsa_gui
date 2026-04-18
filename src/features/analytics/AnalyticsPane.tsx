@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import {
   AnalyticsFocus, AnalyticsSubTab, ChartSectionConfig, GridRow, RunHistoryEntry, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel,
 } from '../../shared/types';
 import { EMPTY_METRIC_KEY } from '../../constants';
-import { numberValue, stringValue, carrierColor, loadingColor } from '../../shared/utils/helpers';
+import { numberValue, stringValue, carrierColor, loadingColor, priceColor } from '../../shared/utils/helpers';
 import { FitToBounds } from '../map/FitToBounds';
-import { MapLegend } from '../map/MapLegend';
+import { MapLegend, SmpLegend } from '../map/MapLegend';
 import { SummaryCards } from '../../shared/components/SummaryCards';
 import { UserDefinedChartCard } from '../../components/charts/UserDefinedChartCard';
 import { ResultsDashboard } from './ResultsDashboard';
@@ -89,6 +89,21 @@ export function AnalyticsPane({
   );
   const hasLineLoading = results.lineLoading.length > 0;
 
+  // Per-bus average SMP for nodal price colouring
+  const busAvgSmp = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [name, detail] of Object.entries(results.assetDetails.buses)) {
+      const pts = detail.netSeries;
+      if (pts.length === 0) continue;
+      out[name] = pts.reduce((s, p) => s + p.smp, 0) / pts.length;
+    }
+    return out;
+  }, [results.assetDetails.buses]);
+  const smpValues = Object.values(busAvgSmp);
+  const smpMin = smpValues.length > 0 ? Math.min(...smpValues) : 0;
+  const smpMax = smpValues.length > 0 ? Math.max(...smpValues) : 1;
+  const hasSmp = smpValues.some((v) => Math.abs(v) > 0.01);
+
   // Unique generator carriers for legend
   const uniqueCarriers = Array.from(
     new Set(model.generators.map((g) => stringValue(g.carrier)).filter(Boolean)),
@@ -113,7 +128,6 @@ export function AnalyticsPane({
           systemLoadRows={systemLoadRows}
           systemPriceRows={systemPriceRows}
           storageRows={storageRows}
-          runHistory={runHistory}
         />
       )}
 
@@ -178,13 +192,17 @@ export function AnalyticsPane({
             {model.buses.map((bus, index) => {
               const busName = stringValue(bus.name);
               const sel = analyticsFocus.type === 'bus' && analyticsFocus.key === busName;
+              const avgSmp = busAvgSmp[busName];
+              const busFill = hasSmp && avgSmp !== undefined
+                ? priceColor(avgSmp, smpMin, smpMax)
+                : '#2563eb';
               return (
                 <CircleMarker key={`${busName}-analytics-${index}`}
                   center={[numberValue(bus.y), numberValue(bus.x)]}
                   radius={sel ? 12 : 8}
-                  pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 2, fillColor: '#2563eb', fillOpacity: 0.96 }}
+                  pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 2, fillColor: busFill, fillOpacity: 0.96 }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'bus', key: busName }) }}>
-                  <Tooltip>{busName} · Bus</Tooltip>
+                  <Tooltip>{busName} · Bus{hasSmp && avgSmp !== undefined ? ` · Avg SMP ${avgSmp.toFixed(1)} $/MWh` : ''}</Tooltip>
                 </CircleMarker>
               );
             })}
@@ -234,6 +252,7 @@ export function AnalyticsPane({
             })}
           </MapContainer>
           <MapLegend carriers={uniqueCarriers} showLines={!hasLineLoading} />
+          <SmpLegend show={hasSmp} min={smpMin} max={smpMax} />
         </div>
       </section>
 
