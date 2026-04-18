@@ -1181,9 +1181,8 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
-  font-size: 0.74rem;
-  min-width: 120px;
-  max-width: 200px;
+  min-width: 160px;
+  max-width: 260px;
   max-height: 380px;
   overflow-y: auto;
   display: flex;
@@ -1196,21 +1195,29 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 0;
+  padding: 3px 0;       /* fixed vertical rhythm — never changes */
   color: var(--text);
-  font-size: 0.74rem;
-  white-space: nowrap;
+  font-size: 0.74rem;   /* fixed — never scales down */
+  min-width: 0;         /* allow flex children to shrink */
+}
+
+/* name truncates with ellipsis; never wraps or rotates */
+.legend-item > span:not(.legend-swatch) {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .legend-item strong {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.72rem;   /* fixed */
   font-weight: 500;
-  margin-left: auto;
-  padding-left: 6px;
+  margin-left: 6px;
+  padding-left: 4px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 @media (max-width: 980px) {
@@ -1234,8 +1241,8 @@ button {
   .legend-list {
     max-width: 100%;
     max-height: 160px;
-    flex-direction: row;
-    flex-wrap: wrap;
+    overflow-y: auto;
+    flex-direction: column;
   }
 }
 
