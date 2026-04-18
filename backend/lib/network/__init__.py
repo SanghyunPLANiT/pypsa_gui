@@ -14,6 +14,7 @@ from .buses import add_buses, add_loads
 from .constraints import add_global_constraints
 from .generators import add_generators, add_grid_imports_and_shedding
 from .lines import add_links, add_lines, add_shunt_impedances, add_transformers
+from .processes import add_processes
 from .storage import add_storage_units, add_stores
 from .validators import validate_model
 
@@ -102,6 +103,9 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     add_lines(network, model)
     add_links(network, model)
     add_transformers(network, model)
+
+    # Processes (multi-input/output energy conversion — PyPSA Process component)
+    add_processes(network, model)
 
     # Constraints
     add_global_constraints(network, model, period_factor)

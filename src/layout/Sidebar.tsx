@@ -23,7 +23,6 @@ export interface SidebarProps {
   onSave: () => void;
   onSaveAs: () => void;
   onDemo: () => void;
-  onSCDemo: () => void;
   onExport: () => void;
   runHistory: RunHistoryEntry[];
   onRestoreRun: (entry: RunHistoryEntry) => void;
@@ -42,7 +41,6 @@ export function Sidebar({
   onSave,
   onSaveAs,
   onDemo,
-  onSCDemo,
   onExport,
   runHistory,
   onRestoreRun,
@@ -63,7 +61,6 @@ export function Sidebar({
           <button className="tb-btn sg-full" onClick={onSave}>Save</button>
           <button className="tb-btn sg-full" onClick={onSaveAs}>Save As</button>
           <button className="tb-btn tb-btn--muted sg-full" onClick={onDemo}>Demo</button>
-          <button className="tb-btn tb-btn--muted sg-full" onClick={onSCDemo} title="Load a sector coupling example with Power→Heat, Power→H₂, and Power→EV">SC Demo</button>
           <button
             className="tb-btn sg-full"
             disabled={!results}

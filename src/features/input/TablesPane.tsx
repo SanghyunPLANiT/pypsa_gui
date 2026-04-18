@@ -7,8 +7,6 @@ import { AttrDef, PYPSA_OPTIONAL_ATTRS } from '../../constants/pypsa_attributes'
 import { getColumns, getTsFirstCol, stringValue } from '../../shared/utils/helpers';
 import { parseCsvToGridRows } from '../../shared/utils/workbook';
 import { InputAnalyser } from './InputAnalyser';
-import { SectorCouplingPanel } from './SectorCouplingPanel';
-import { SectorBundle } from '../../constants/sectorCouplingTemplates';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -425,12 +423,11 @@ interface TablesPaneProps {
   onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
   onAddColumn: (sheet: SheetName, col: string, defaultValue: string | number | boolean) => void;
   onImportTsSheet: (sheet: TsSheetName, rows: GridRow[]) => void;
-  onAddSectorBundle?: (bundle: SectorBundle, powerBus: string, prefix: string) => void;
   issues?: ModelIssue[];
   jumpTo?: { sheet: string; rowIndex: number } | null;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet, onAddSectorBundle, issues = [], jumpTo }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet, issues = [], jumpTo }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [jumpHighlight, setJumpHighlight] = useState<number | null>(null);
 
@@ -700,14 +697,6 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
             anchorRect={addColAnchor}
             onAdd={(attr) => onAddColumn(sel.sheet as SheetName, attr.col, attr.default)}
             onClose={() => setAddColOpen(false)}
-          />
-        )}
-
-        {/* Sector coupling template panel — shown only on the Links static sheet */}
-        {!isTs && sel.sheet === 'links' && onAddSectorBundle && (
-          <SectorCouplingPanel
-            busNames={model.buses.map((b) => stringValue(b.name)).filter(Boolean)}
-            onInsert={onAddSectorBundle}
           />
         )}
 

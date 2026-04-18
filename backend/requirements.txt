@@ -1,6 +1,6 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
-pypsa>=0.33
+pypsa @ git+https://github.com/PyPSA/PyPSA.git  # Process component not yet in stable release
 pandas>=2.2
 numpy>=2.1
 scipy>=1.14

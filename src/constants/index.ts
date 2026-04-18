@@ -56,7 +56,8 @@ export const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
   },
   processes: {
     name: 'new_process', bus0: 'New Bus', bus1: 'New Bus',
-    carrier: 'hydrogen', p_nom: 100, efficiency: 0.75, marginal_cost: 20,
+    carrier: '', p_nom: 100, efficiency: 0.75,
+    p_min_pu: 0, p_max_pu: 1, marginal_cost: 0, capital_cost: 0,
   },
 };
 
@@ -67,17 +68,6 @@ export const CARRIER_COLORS: Record<string, string> = {
   Solar: '#f59e0b', Wind: '#0f766e', Hydro: '#2563eb', Storage: '#14b8a6',
   battery: '#0ea5e9', Imports: '#dc2626', LoadShedding: '#991b1b',
   load: '#94a3b8', HVDC: '#6366f1', Other: '#94a3b8',
-  // Sector coupling
-  heat: '#ef4444',
-  'power-to-heat': '#fb923c',
-  'heat-pump': '#f97316',
-  H2: '#06b6d4',
-  hydrogen: '#06b6d4',
-  electrolyzer: '#0ea5e9',
-  'fuel-cell': '#3b82f6',
-  EV: '#10b981',
-  'EV-charging': '#34d399',
-  V2G: '#6ee7b7',
 };
 
 // ── Constraint definitions ────────────────────────────────────────────────────
@@ -112,4 +102,5 @@ export const TABLE_GROUPS: Array<{ label: string; sheet: SheetName; tsSheet?: Ts
   { label: 'Transformers',       sheet: 'transformers' },
   { label: 'Shunt Impedances',   sheet: 'shunt_impedances' },
   { label: 'Global Constraints', sheet: 'global_constraints' },
+  { label: 'Processes',          sheet: 'processes' },
 ];
