@@ -48,7 +48,6 @@ function AppInner() {
   const [snapshotWeight, setSnapshotWeight] = useState(1);
   const [constraints, setConstraints] = useState<CustomConstraint[]>(DEFAULT_CONSTRAINTS);
   const [carbonPrice, setCarbonPrice] = useState<number>(0);
-  const [co2Budget, setCo2Budget] = useState<number>(0);
   const [forceLp, setForceLp] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [analyticsFocus, setAnalyticsFocus] = useState<AnalyticsFocus>({ type: 'system' });
@@ -301,7 +300,7 @@ function AppInner() {
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
-      options: { snapshotCount, snapshotStart, snapshotWeight, co2Budget, forceLp },
+      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp },
     };
 
     setRunDialogOpen(false);
@@ -662,7 +661,6 @@ function AppInner() {
         snapshotEnd={snapshotEnd}
         snapshotWeight={snapshotWeight}
         carbonPrice={carbonPrice}
-        co2Budget={co2Budget}
         forceLp={forceLp}
         dryRun={dryRun}
         snapshots={model.snapshots}
@@ -670,7 +668,6 @@ function AppInner() {
         onSnapshotEndChange={setSnapshotEnd}
         onSnapshotWeightChange={setSnapshotWeight}
         onCarbonPriceChange={setCarbonPrice}
-        onCo2BudgetChange={setCo2Budget}
         onForceLpChange={setForceLp}
         onDryRunChange={setDryRun}
         onRun={handleRunModel}

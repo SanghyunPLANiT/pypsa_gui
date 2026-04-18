@@ -18,7 +18,6 @@ export interface RunDialogProps {
   snapshotEnd: number;
   snapshotWeight: number;
   carbonPrice: number;
-  co2Budget: number;
   forceLp: boolean;
   dryRun: boolean;
   snapshots: GridRow[];
@@ -27,7 +26,6 @@ export interface RunDialogProps {
   onSnapshotEndChange: (v: number) => void;
   onSnapshotWeightChange: (v: number) => void;
   onCarbonPriceChange: (v: number) => void;
-  onCo2BudgetChange: (v: number) => void;
   onForceLpChange: (v: boolean) => void;
   onDryRunChange: (v: boolean) => void;
 
@@ -68,7 +66,6 @@ export function RunDialog({
   snapshotEnd,
   snapshotWeight,
   carbonPrice,
-  co2Budget,
   forceLp,
   dryRun,
   snapshots,
@@ -76,7 +73,6 @@ export function RunDialog({
   onSnapshotEndChange,
   onSnapshotWeightChange,
   onCarbonPriceChange,
-  onCo2BudgetChange,
   onForceLpChange,
   onDryRunChange,
   onRun,
@@ -215,28 +211,6 @@ export function RunDialog({
           {carbonPrice > 0 && (
             <span className="run-carbon-hint">
               Added to each generator's marginal cost proportional to CO₂ emissions
-            </span>
-          )}
-        </div>
-
-        {/* CO2 budget (ETS) */}
-        <div className="run-carbon-row" style={{ marginTop: 8 }}>
-          <label className="run-carbon-label" htmlFor="run-co2-budget">
-            <span>CO₂ budget</span>
-            <span className="run-carbon-unit">ktCO₂</span>
-          </label>
-          <input
-            id="run-co2-budget"
-            type="number"
-            className="run-carbon-input"
-            min={0}
-            step={10}
-            value={co2Budget}
-            onChange={(e) => onCo2BudgetChange(Math.max(0, parseFloat(e.target.value) || 0))}
-          />
-          {co2Budget > 0 && (
-            <span className="run-carbon-hint">
-              Caps total CO₂ at {co2Budget.toLocaleString()} ktCO₂ — endogenous shadow price reported in results
             </span>
           )}
         </div>
