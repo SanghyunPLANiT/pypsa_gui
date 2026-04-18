@@ -203,7 +203,7 @@ export interface Co2Shadow {
 
 export interface ExpansionAsset {
   name: string;
-  component: 'Generator' | 'StorageUnit';
+  component: 'Generator' | 'StorageUnit' | 'Store' | 'Link' | 'Line';
   carrier: string;
   bus: string;
   p_nom_mw: number;
@@ -211,6 +211,7 @@ export interface ExpansionAsset {
   delta_mw: number;
   capital_cost: number;
   capex_annual: number;
+  unit?: string;   // 'MW' (default), 'MWh' (Store), 'MVA' (Line)
 }
 
 export interface RunResults {
@@ -220,6 +221,7 @@ export interface RunResults {
   systemPriceSeries: ValuePoint[];
   systemEmissionsSeries: ValuePoint[];
   storageSeries: StoragePoint[];
+  nodalPriceSeries?: SeriesPoint[];   // per-bus LMP time series
   carrierMix: MixItem[];
   costBreakdown: Array<{ label: string; value: number }>;
   nodalBalance: Array<{ label: string; load: number; generation: number }>;

@@ -27,6 +27,7 @@ def add_generators(
     notes: list[str],
     step: int = 1,
     discount_rate: float = 0.05,
+    force_lp: bool = False,
 ) -> None:
     generators = workbook_rows(model, "generators")
     if not generators:
@@ -49,7 +50,16 @@ def add_generators(
             + carbon_price * _carrier_emissions(network, carrier)
         )
         p_max_pu_static = number(row.get("p_max_pu"), 1.0)
+        p_min_pu_static = number(row.get("p_min_pu"), 0.0)
         extendable = bool_value(row.get("extendable"), False)
+        # committable=True and p_nom_extendable=True are mutually exclusive in PyPSA
+        committable = bool_value(row.get("committable"), False) and not force_lp
+        if committable and extendable:
+            notes.append(
+                f"Generator '{name}': committable=True overrides extendable=True "
+                f"(PyPSA MIP restriction — capacity will not be optimised)."
+            )
+            extendable = False
         raw_capital_cost = number(row.get("capital_cost"), 0.0)
         if extendable:
             lifetime = number(row.get("asset_lifetime"), 20.0)
@@ -61,21 +71,26 @@ def add_generators(
             )
         else:
             annualised_capital_cost = 0.0
-        network.add(
-            "Generator",
-            name,
+        gen_kwargs: dict[str, Any] = dict(
             bus=bus,
             carrier=carrier,
             control=text(row.get("control"), "PQ"),
             p_nom=p_nom,
             p_nom_min=0.0,
-            p_min_pu=0.0,
+            p_min_pu=p_min_pu_static,
             p_max_pu=p_max_pu_static,
             marginal_cost=marginal_cost,
             capital_cost=annualised_capital_cost,
             p_nom_extendable=extendable,
-            committable=False,
+            committable=committable,
         )
+        # Unit-commitment attributes — only relevant when committable=True
+        if committable:
+            for uc_attr in ("min_up_time", "min_down_time", "start_up_cost", "shut_down_cost"):
+                val = number(row.get(uc_attr), 0.0)
+                if val > 0:
+                    gen_kwargs[uc_attr] = val
+        network.add("Generator", name, **gen_kwargs)
         applied = apply_scaled_static_attributes(network.generators, name, row, period_factor)
         if applied:
             notes.append(f"Scaled {', '.join(applied)} for generator {name} by period factor {period_factor:.2f}.")

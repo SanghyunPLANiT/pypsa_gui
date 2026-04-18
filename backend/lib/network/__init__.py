@@ -92,10 +92,12 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     add_shunt_impedances(network, model)
 
     # Generation
+    force_lp = bool(options.get("forceLp", False))
     add_generators(
         network, model, snapshots, period_factor,
         carbon_price, notes,
         step=step, discount_rate=discount_rate,
+        force_lp=force_lp,
     )
     add_grid_imports_and_shedding(network, load_totals, carbon_price, notes)
 
@@ -109,6 +111,24 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
 
     # Constraints
     add_global_constraints(network, model, period_factor)
+
+    # CO2 budget from run options — adds a primary_energy GlobalConstraint on the fly.
+    # Input unit: ktCO2. Scaled by period_factor so it applies to the modelled window.
+    co2_budget_kt = number(options.get("co2Budget", 0), 0.0)
+    if co2_budget_kt > 0:
+        budget_tco2 = co2_budget_kt * 1000.0 * period_factor
+        network.add(
+            "GlobalConstraint",
+            "_run_co2_budget",
+            type="primary_energy",
+            carrier_attribute="co2_emissions",
+            sense="<=",
+            constant=budget_tco2,
+        )
+        notes.append(
+            f"CO2 budget constraint added: {co2_budget_kt:.0f} ktCO2 "
+            f"({budget_tco2:.0f} tCO2 after period scaling by {period_factor:.4f})."
+        )
 
     notes.append(
         f"Prepared PyPSA case with {len(network.buses)} buses, "

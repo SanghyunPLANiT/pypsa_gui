@@ -87,30 +87,35 @@ function ExpansionTable({ assets }: { assets: ExpansionAsset[] }) {
             <th>Type</th>
             <th>Carrier</th>
             <th>Bus</th>
-            <th className="num">Installed (MW)</th>
-            <th className="num">Optimised (MW)</th>
-            <th className="num">New build (MW)</th>
+            <th className="num">Installed</th>
+            <th className="num">Optimised</th>
+            <th className="num">New build</th>
             <th className="num">Annual CAPEX ($)</th>
           </tr>
         </thead>
         <tbody>
-          {assets.map((a) => (
-            <tr key={a.name} className={a.delta_mw > 0 ? 'row-new-build' : ''}>
-              <td>{a.name}</td>
-              <td>{a.component}</td>
-              <td>
-                <span className="carrier-dot" style={{ backgroundColor: carrierColor(a.carrier) }} />
-                {a.carrier}
-              </td>
-              <td>{a.bus}</td>
-              <td className="num">{a.p_nom_mw.toLocaleString()}</td>
-              <td className="num">{a.p_nom_opt_mw.toLocaleString()}</td>
-              <td className={`num ${a.delta_mw > 0 ? 'delta-positive' : a.delta_mw < 0 ? 'delta-negative' : ''}`}>
-                {a.delta_mw > 0 ? '+' : ''}{a.delta_mw.toLocaleString()}
-              </td>
-              <td className="num">{a.capex_annual > 0 ? `$${Math.round(a.capex_annual).toLocaleString()}` : '—'}</td>
-            </tr>
-          ))}
+          {assets.map((a) => {
+            const unit = a.unit ?? 'MW';
+            return (
+              <tr key={a.name} className={a.delta_mw > 0 ? 'row-new-build' : ''}>
+                <td>{a.name}</td>
+                <td>{a.component}</td>
+                <td>
+                  {a.carrier && (
+                    <span className="carrier-dot" style={{ backgroundColor: carrierColor(a.carrier) }} />
+                  )}
+                  {a.carrier || '—'}
+                </td>
+                <td>{a.bus}</td>
+                <td className="num">{a.p_nom_mw.toLocaleString()} {unit}</td>
+                <td className="num">{a.p_nom_opt_mw.toLocaleString()} {unit}</td>
+                <td className={`num ${a.delta_mw > 0 ? 'delta-positive' : a.delta_mw < 0 ? 'delta-negative' : ''}`}>
+                  {a.delta_mw > 0 ? '+' : ''}{a.delta_mw.toLocaleString()} {unit}
+                </td>
+                <td className="num">{a.capex_annual > 0 ? `$${Math.round(a.capex_annual).toLocaleString()}` : '—'}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

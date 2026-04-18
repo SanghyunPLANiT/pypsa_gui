@@ -18,6 +18,8 @@ export interface RunDialogProps {
   snapshotEnd: number;
   snapshotWeight: number;
   carbonPrice: number;
+  co2Budget: number;
+  forceLp: boolean;
   dryRun: boolean;
   snapshots: GridRow[];
 
@@ -25,6 +27,8 @@ export interface RunDialogProps {
   onSnapshotEndChange: (v: number) => void;
   onSnapshotWeightChange: (v: number) => void;
   onCarbonPriceChange: (v: number) => void;
+  onCo2BudgetChange: (v: number) => void;
+  onForceLpChange: (v: boolean) => void;
   onDryRunChange: (v: boolean) => void;
 
   onRun: () => void;
@@ -64,12 +68,16 @@ export function RunDialog({
   snapshotEnd,
   snapshotWeight,
   carbonPrice,
+  co2Budget,
+  forceLp,
   dryRun,
   snapshots,
   onSnapshotStartChange,
   onSnapshotEndChange,
   onSnapshotWeightChange,
   onCarbonPriceChange,
+  onCo2BudgetChange,
+  onForceLpChange,
   onDryRunChange,
   onRun,
 }: RunDialogProps) {
@@ -210,6 +218,41 @@ export function RunDialog({
             </span>
           )}
         </div>
+
+        {/* CO2 budget (ETS) */}
+        <div className="run-carbon-row" style={{ marginTop: 8 }}>
+          <label className="run-carbon-label" htmlFor="run-co2-budget">
+            <span>CO₂ budget</span>
+            <span className="run-carbon-unit">ktCO₂</span>
+          </label>
+          <input
+            id="run-co2-budget"
+            type="number"
+            className="run-carbon-input"
+            min={0}
+            step={10}
+            value={co2Budget}
+            onChange={(e) => onCo2BudgetChange(Math.max(0, parseFloat(e.target.value) || 0))}
+          />
+          {co2Budget > 0 && (
+            <span className="run-carbon-hint">
+              Caps total CO₂ at {co2Budget.toLocaleString()} ktCO₂ — endogenous shadow price reported in results
+            </span>
+          )}
+        </div>
+
+        {/* Force LP — override all committable=True generators to LP (faster) */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, marginBottom: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={forceLp}
+            onChange={(e) => onForceLpChange(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: '0.9rem' }}>
+            <strong>Force LP</strong> — ignore <code>committable</code> flags; solve as linear programme (faster)
+          </span>
+        </label>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, cursor: 'pointer' }}>
           <input

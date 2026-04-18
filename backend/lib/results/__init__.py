@@ -129,6 +129,17 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     if total_capex_annual > 0:
         cost_breakdown.append({"label": "Capital cost", "value": round(total_capex_annual)})
 
+    # Per-bus LMP (nodal marginal prices) — one value series per bus
+    nodal_price_series: list[dict] = []
+    if not network.buses_t.marginal_price.empty:
+        mp = network.buses_t.marginal_price
+        for ts in network.snapshots:
+            nodal_price_series.append({
+                "label": str(ts),
+                "timestamp": str(ts),
+                "values": {bus: round(float(mp.at[ts, bus]), 2) for bus in mp.columns},
+            })
+
     # Series
     dispatch_s, gen_dispatch_s = build_dispatch_series(network, by_carrier, load_dispatch, generator_dispatch_frame)
     price_s, emissions_s = build_price_emissions_series(network, by_carrier, price_series, emissions_factors)
@@ -176,6 +187,15 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         {"label": "Transmission stress", "value": f"{round(np.mean([x['value'] for x in line_loading]) if line_loading else 0):,}%", "detail": f"{sum(1 for x in line_loading if x['value'] > 80.0)} corridors above 80%"},
     ]
 
+    # Unit-commitment status note
+    committable_gens = [g for g in network.generators.index if network.generators.at[g, "committable"]] \
+        if "committable" in network.generators.columns else []
+    if committable_gens:
+        notes.append(
+            f"MIP unit commitment enabled for {len(committable_gens)} generator(s): {', '.join(committable_gens[:5])}"
+            + (" …" if len(committable_gens) > 5 else "") + "."
+        )
+
     notes.extend([
         f"Backend PyPSA run solved {len(network.snapshots)} hourly snapshots with {len(network.generators)} generators and {len(network.loads)} loads.",
         f"Average price settled at {average_price:.1f} $/MWh and peaked at {float(price_series.max()):.1f} $/MWh.",
@@ -190,6 +210,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         "systemPriceSeries": price_s,
         "systemEmissionsSeries": emissions_s,
         "storageSeries": storage_s,
+        "nodalPriceSeries": nodal_price_series,
         "carrierMix": carrier_mix,
         "costBreakdown": cost_breakdown,
         "nodalBalance": nodal_balance,

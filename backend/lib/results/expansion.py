@@ -67,4 +67,69 @@ def build_expansion_results(network: pypsa.Network) -> list[dict[str, Any]]:
                 }
             )
 
+    # ── Stores (energy capacity optimisation) ────────────────────────────────
+    if not network.stores.empty and "e_nom_extendable" in network.stores.columns:
+        ext_st = network.stores[network.stores.e_nom_extendable]
+        for name in ext_st.index:
+            e_nom = float(ext_st.at[name, "e_nom"])
+            e_nom_opt = float(ext_st.at[name, "e_nom_opt"]) if "e_nom_opt" in ext_st.columns else e_nom
+            capital_cost = float(ext_st.at[name, "capital_cost"]) if "capital_cost" in ext_st.columns else 0.0
+            results.append(
+                {
+                    "name": name,
+                    "component": "Store",
+                    "carrier": str(ext_st.at[name, "carrier"]) if "carrier" in ext_st.columns else "",
+                    "bus": str(ext_st.at[name, "bus"]),
+                    "p_nom_mw": round(e_nom, 1),
+                    "p_nom_opt_mw": round(e_nom_opt, 1),
+                    "delta_mw": round(e_nom_opt - e_nom, 1),
+                    "capital_cost": round(capital_cost, 2),
+                    "capex_annual": round(capital_cost * e_nom_opt),
+                    "unit": "MWh",
+                }
+            )
+
+    # ── Links (p_nom_extendable) ───────────────────────────────────────────────
+    if not network.links.empty and "p_nom_extendable" in network.links.columns:
+        ext_li = network.links[network.links.p_nom_extendable]
+        for name in ext_li.index:
+            p_nom = float(ext_li.at[name, "p_nom"])
+            p_nom_opt = float(ext_li.at[name, "p_nom_opt"]) if "p_nom_opt" in ext_li.columns else p_nom
+            capital_cost = float(ext_li.at[name, "capital_cost"]) if "capital_cost" in ext_li.columns else 0.0
+            results.append(
+                {
+                    "name": name,
+                    "component": "Link",
+                    "carrier": str(ext_li.at[name, "carrier"]) if "carrier" in ext_li.columns else "",
+                    "bus": str(ext_li.at[name, "bus0"]),
+                    "p_nom_mw": round(p_nom, 1),
+                    "p_nom_opt_mw": round(p_nom_opt, 1),
+                    "delta_mw": round(p_nom_opt - p_nom, 1),
+                    "capital_cost": round(capital_cost, 2),
+                    "capex_annual": round(capital_cost * p_nom_opt),
+                }
+            )
+
+    # ── Lines (s_nom_extendable) ───────────────────────────────────────────────
+    if not network.lines.empty and "s_nom_extendable" in network.lines.columns:
+        ext_ln = network.lines[network.lines.s_nom_extendable]
+        for name in ext_ln.index:
+            s_nom = float(ext_ln.at[name, "s_nom"])
+            s_nom_opt = float(ext_ln.at[name, "s_nom_opt"]) if "s_nom_opt" in ext_ln.columns else s_nom
+            capital_cost = float(ext_ln.at[name, "capital_cost"]) if "capital_cost" in ext_ln.columns else 0.0
+            results.append(
+                {
+                    "name": name,
+                    "component": "Line",
+                    "carrier": "",
+                    "bus": str(ext_ln.at[name, "bus0"]),
+                    "p_nom_mw": round(s_nom, 1),
+                    "p_nom_opt_mw": round(s_nom_opt, 1),
+                    "delta_mw": round(s_nom_opt - s_nom, 1),
+                    "capital_cost": round(capital_cost, 2),
+                    "capex_annual": round(capital_cost * s_nom_opt),
+                    "unit": "MVA",
+                }
+            )
+
     return results

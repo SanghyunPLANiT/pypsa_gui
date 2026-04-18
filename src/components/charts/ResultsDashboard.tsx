@@ -339,6 +339,35 @@ export function ResultsDashboard({
         </DashboardSection>
       </div>
 
+      {/* Nodal prices (LMP) — only when multi-bus model */}
+      {results.nodalPriceSeries && results.nodalPriceSeries.length > 0 && (() => {
+        const busList = Object.keys(results.nodalPriceSeries[0].values ?? {});
+        if (busList.length < 2) return null;  // single-bus: no spatial differentiation
+        const BUS_COLORS = ['#6366f1','#f97316','#14b8a6','#f43f5e','#eab308','#8b5cf6','#10b981','#3b82f6'];
+        const lmpSeries: TimeSeriesSeries[] = busList.map((b, i) => ({
+          key: b,
+          label: b,
+          color: BUS_COLORS[i % BUS_COLORS.length],
+        }));
+        const lmpRows: TimeSeriesRow[] = results.nodalPriceSeries.map((pt) => ({
+          label: pt.label,
+          timestamp: pt.timestamp,
+          ...pt.values,
+        }));
+        return (
+          <DashboardSection title="Nodal prices (LMP)" defaultOpen={false}>
+            <InteractiveTimeSeriesCard
+              title="Locational marginal prices by bus"
+              description="Per-bus marginal prices ($/MWh) — spatial differentiation indicates binding transmission constraints"
+              data={lmpRows}
+              series={lmpSeries}
+              mode="line"
+              stacked={false}
+            />
+          </DashboardSection>
+        );
+      })()}
+
       {/* Storage SoC */}
       {hasStorage && (
         <DashboardSection title="Storage state of charge" onExport={exportStorage}>
