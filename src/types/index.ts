@@ -299,10 +299,13 @@ export interface MetricOption {
   allowDonut: boolean;
 }
 
+export type GroupByOption = 'carrier' | 'asset';
+
 export interface ChartSectionConfig {
   id: number;
   focusType: AnalyticsFocus['type'];  // per-card component selection
-  focusKey: string;                   // empty for 'system'
+  focusKeys: string[];                // [] = all assets of that type; ['x'] = single
+  groupBy: GroupByOption;             // how multi-asset series are combined
   metricKey: string;
   chartType: ChartSectionType;
   timeframe: TimeframeOption;

@@ -1,150 +1,274 @@
-import { AnalyticsFocus, MetricOption, RunResults, TimeSeriesRow, TimeSeriesSeries, WorkbookModel } from '../../shared/types';
+import { useMemo } from 'react';
+import {
+  AnalyticsFocus,
+  GroupByOption,
+  MetricOption,
+  RunResults,
+  TimeSeriesRow,
+  TimeSeriesSeries,
+  WorkbookModel,
+} from '../../shared/types';
 import { carrierColor, hashColor, numberValue } from '../../shared/utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from '../../shared/utils/analytics';
+
+// ── Multi-generator aggregation ───────────────────────────────────────────────
+
+type GenField = 'output' | 'curtailment' | 'available' | 'emissions';
+
+function getGenSeries(
+  gen: RunResults['assetDetails']['generators'][string],
+  field: GenField,
+): Array<{ label: string; timestamp: string; [k: string]: number | string }> {
+  switch (field) {
+    case 'output':      return gen.outputSeries      as any;
+    case 'curtailment': return gen.curtailmentSeries as any;
+    case 'available':   return gen.availableSeries   as any;
+    case 'emissions':   return gen.emissionsSeries   as any;
+  }
+}
+
+function getGenFieldValue(pt: Record<string, unknown>, field: GenField): number {
+  return (pt[field] as number) ?? 0;
+}
+
+function buildMultiGenMetric(
+  assetDetails: RunResults['assetDetails'],
+  genNames: string[],
+  field: GenField,
+  groupBy: GroupByOption,
+): { rows: TimeSeriesRow[]; series: TimeSeriesSeries[] } {
+  const byLabel = new Map<string, { timestamp?: string; vals: Record<string, number> }>();
+
+  for (const name of genNames) {
+    const gen = assetDetails.generators[name];
+    if (!gen) continue;
+    const seriesKey = groupBy === 'carrier' ? (gen.carrier || 'Unknown') : name;
+
+    for (const pt of getGenSeries(gen, field)) {
+      const val = getGenFieldValue(pt as any, field);
+      if (!byLabel.has(pt.label)) byLabel.set(pt.label, { timestamp: pt.timestamp, vals: {} });
+      const e = byLabel.get(pt.label)!;
+      e.vals[seriesKey] = (e.vals[seriesKey] || 0) + val;
+    }
+  }
+
+  const seriesKeys = Array.from(
+    new Set(Array.from(byLabel.values()).flatMap((e) => Object.keys(e.vals))),
+  );
+
+  const rows: TimeSeriesRow[] = Array.from(byLabel.entries()).map(([label, e]) => ({
+    label,
+    timestamp: e.timestamp,
+    ...e.vals,
+  }));
+
+  const series: TimeSeriesSeries[] = seriesKeys.map((k) => ({
+    key: k,
+    label: k,
+    color: groupBy === 'carrier' ? carrierColor(k) : hashColor(k),
+  }));
+
+  return { rows, series };
+}
+
+// Build all 4 generator metrics for multi-asset selection
+function buildMultiGenOptions(
+  assetDetails: RunResults['assetDetails'],
+  genNames: string[],
+  groupBy: GroupByOption,
+): MetricOption[] {
+  const GEN_FIELDS: Array<{ field: GenField; label: string; unit: string; reducer: MetricOption['reducer'] }> = [
+    { field: 'output',      label: 'Output',          unit: 'MW',     reducer: 'mean' },
+    { field: 'available',   label: 'Available output', unit: 'MW',     reducer: 'mean' },
+    { field: 'curtailment', label: 'Curtailment',      unit: 'MW',     reducer: 'mean' },
+    { field: 'emissions',   label: 'Emissions',        unit: 'tCO2e',  reducer: 'sum'  },
+  ];
+
+  return GEN_FIELDS.map(({ field, label, unit, reducer }) => {
+    const { rows, series } = buildMultiGenMetric(assetDetails, genNames, field, groupBy);
+    return { key: field, label, unit, rows, series, reducer, allowDonut: groupBy === 'carrier' };
+  });
+}
+
+// Generic multi-asset merge (by asset name) — used for Bus, Branch, Storage, Store
+function buildMultiAssetOptions(
+  assetDetails: RunResults['assetDetails'],
+  assetKeys: string[],
+  focusType: Exclude<AnalyticsFocus['type'], 'system'>,
+): MetricOption[] {
+  const byMetric = new Map<string, MetricOption>();
+
+  for (const assetKey of assetKeys) {
+    const singleFocus = { type: focusType, key: assetKey } as AnalyticsFocus;
+    const opts = buildSingleAssetOptions(assetDetails, singleFocus);
+
+    for (const opt of opts) {
+      const merged = byMetric.get(opt.key) ?? {
+        key: opt.key,
+        label: opt.label,
+        unit: opt.unit,
+        rows: [] as TimeSeriesRow[],
+        series: [] as TimeSeriesSeries[],
+        reducer: opt.reducer,
+        allowDonut: false,
+      };
+
+      const rowMap = new Map(merged.rows.map((r) => [`${r.timestamp ?? ''}|${r.label}`, r]));
+
+      for (const s of opt.series) {
+        const sk = opt.series.length === 1 ? assetKey : `${assetKey}__${s.key}`;
+        const sl = opt.series.length === 1 ? assetKey : `${assetKey} ${s.label}`;
+        if (!merged.series.some((x) => x.key === sk)) {
+          merged.series.push({ key: sk, label: sl, color: hashColor(`${focusType}:${assetKey}:${s.key}`) });
+        }
+        for (const row of opt.rows) {
+          const rid = `${row.timestamp ?? ''}|${row.label}`;
+          const target = rowMap.get(rid) ?? { label: row.label, timestamp: row.timestamp };
+          target[sk] = row[s.key];
+          rowMap.set(rid, target);
+        }
+      }
+
+      merged.rows = Array.from(rowMap.values());
+      byMetric.set(opt.key, merged);
+    }
+  }
+
+  return Array.from(byMetric.values());
+}
+
+// ── Single-asset options (unchanged logic) ────────────────────────────────────
+
+function buildSingleAssetOptions(
+  assetDetails: RunResults['assetDetails'],
+  focus: AnalyticsFocus,
+): MetricOption[] {
+  if (focus.type === 'generator') {
+    const g = assetDetails.generators[focus.key];
+    if (!g) return [];
+    const c = carrierColor(g.carrier || 'Other');
+    return [
+      { key: 'output',      label: 'Output',          unit: 'MW',    rows: g.outputSeries.map((p)      => ({ label: p.label, timestamp: p.timestamp, output: p.output })),           series: [{ key: 'output',      label: 'Output MW',         color: c }],         reducer: 'mean', allowDonut: false },
+      { key: 'available',   label: 'Available output', unit: 'MW',    rows: g.availableSeries.map((p)   => ({ label: p.label, timestamp: p.timestamp, available: p.available })),     series: [{ key: 'available',   label: 'Available MW',      color: '#0f766e' }], reducer: 'mean', allowDonut: false },
+      { key: 'curtailment', label: 'Curtailment',      unit: 'MW',    rows: g.curtailmentSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, curtailment: p.curtailment })), series: [{ key: 'curtailment', label: 'Curtailment MW',    color: '#f59e0b' }], reducer: 'mean', allowDonut: false },
+      { key: 'emissions',   label: 'Emissions',        unit: 'tCO2e', rows: g.emissionsSeries.map((p)   => ({ label: p.label, timestamp: p.timestamp, emissions: p.emissions })),     series: [{ key: 'emissions',   label: 'Emissions tCO2e',  color: '#16a34a' }], reducer: 'sum',  allowDonut: false },
+    ];
+  }
+  if (focus.type === 'bus') {
+    const b = assetDetails.buses[focus.key];
+    if (!b) return [];
+    return [
+      { key: 'load',       label: 'Load',             unit: 'MW',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, load: p.load })),             series: [{ key: 'load',       label: 'Load MW',         color: '#f97316' }],  reducer: 'mean', allowDonut: false },
+      { key: 'generation', label: 'Generation',        unit: 'MW',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, generation: p.generation })), series: [{ key: 'generation', label: 'Generation MW',    color: '#2563eb' }],  reducer: 'mean', allowDonut: false },
+      { key: 'smp',        label: 'SMP',               unit: '$/MWh',  rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, smp: p.smp })),               series: [{ key: 'smp',        label: 'SMP $/MWh',       color: '#111827' }],  reducer: 'mean', allowDonut: false },
+      { key: 'emissions',  label: 'Emissions',          unit: 'tCO2e', rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, emissions: p.emissions })),   series: [{ key: 'emissions',  label: 'Emissions tCO2e', color: '#16a34a' }],  reducer: 'sum',  allowDonut: false },
+      ...(b.hasVoltageMagnitude ? [{ key: 'v_mag_pu', label: 'Voltage magnitude', unit: 'p.u.',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_mag_pu: p.v_mag_pu })), series: [{ key: 'v_mag_pu', label: 'Voltage p.u.',    color: '#7c3aed' }], reducer: 'mean' as const, allowDonut: false }] : []),
+      ...(b.hasVoltageAngle    ? [{ key: 'v_ang',     label: 'Voltage angle',     unit: 'deg/rad',  rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_ang: p.v_ang })),       series: [{ key: 'v_ang',     label: 'Voltage angle',  color: '#8b5cf6' }], reducer: 'mean' as const, allowDonut: false }] : []),
+    ];
+  }
+  if (focus.type === 'storageUnit') {
+    const su = assetDetails.storageUnits[focus.key];
+    if (!su) return [];
+    return [
+      { key: 'dispatch',      label: 'Dispatch',        unit: 'MW',  rows: su.dispatchSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, dispatch: p.dispatch })), series: [{ key: 'dispatch', label: 'Dispatch MW', color: '#2563eb' }], reducer: 'mean', allowDonut: false },
+      { key: 'storage_power', label: 'Storage power',   unit: 'MW',  rows: su.chargeSeries.map((p, i) => ({ label: p.label, timestamp: p.timestamp, charge: p.charge, discharge: su.dischargeSeries[i]?.discharge || 0 })), series: [{ key: 'charge', label: 'Charge MW', color: '#0ea5e9' }, { key: 'discharge', label: 'Discharge MW', color: '#f97316' }], reducer: 'mean', allowDonut: true },
+      { key: 'state',         label: 'State of charge', unit: 'MWh', rows: su.stateSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, state: p.state })), series: [{ key: 'state', label: 'State MWh', color: '#14b8a6' }], reducer: 'mean', allowDonut: false },
+    ];
+  }
+  if (focus.type === 'store') {
+    const st = assetDetails.stores[focus.key];
+    if (!st) return [];
+    return [
+      { key: 'energy', label: 'Energy', unit: 'MWh', rows: st.energySeries.map((p) => ({ label: p.label, timestamp: p.timestamp, energy: p.energy })), series: [{ key: 'energy', label: 'Energy MWh', color: '#7c3aed' }], reducer: 'mean', allowDonut: false },
+      { key: 'power',  label: 'Power',  unit: 'MW',  rows: st.powerSeries.map((p)  => ({ label: p.label, timestamp: p.timestamp, power: p.power })),   series: [{ key: 'power',  label: 'Power MW',   color: '#6d28d9' }], reducer: 'mean', allowDonut: false },
+    ];
+  }
+  if (focus.type === 'branch') {
+    const br = assetDetails.branches[focus.key];
+    if (!br) return [];
+    return [
+      { key: 'terminal_flows', label: 'Terminal flows', unit: 'MW', rows: br.flowSeries.map((p)    => ({ label: p.label, timestamp: p.timestamp, p0: p.p0, p1: p.p1 })),       series: [{ key: 'p0', label: 'P0 MW', color: '#2563eb' }, { key: 'p1', label: 'P1 MW', color: '#1d4ed8' }], reducer: 'mean', allowDonut: true  },
+      { key: 'loading',        label: 'Loading',        unit: '%',  rows: br.loadingSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, loading: p.loading })),         series: [{ key: 'loading', label: 'Loading %',  color: '#ea580c' }], reducer: 'mean', allowDonut: false },
+      { key: 'losses',         label: 'Losses',         unit: 'MW', rows: br.lossesSeries.map((p)  => ({ label: p.label, timestamp: p.timestamp, losses: p.losses })),           series: [{ key: 'losses',  label: 'Losses MW', color: '#dc2626' }], reducer: 'mean', allowDonut: false },
+    ];
+  }
+  return [];
+}
+
+// ── Public hook ───────────────────────────────────────────────────────────────
 
 export function useMetricOptions(
   results: RunResults | null,
   _model: WorkbookModel,
-  analyticsFocus: AnalyticsFocus,
-  selectedAssetKeys: string[] = [],
+  focusType: AnalyticsFocus['type'],
+  focusKeys: string[],    // [] = all assets of that type; ['x'] = single
+  groupBy: GroupByOption, // how multi-asset series are combined
 ): MetricOption[] {
-  // ── Derived series ──────────────────────────────────────────────────────────
+  // ── System-level derived rows (always computed, cheap) ──────────────────────
+  const rawDispatch  = (results?.dispatchSeries          || []).map(normalizeSeriesPoint);
+  const rawGenDisp   = (results?.generatorDispatchSeries || []).map(normalizeSeriesPoint);
+  const SKIP         = new Set(['label', 'timestamp', 'total']);
+  const hasValues    = (rows: TimeSeriesRow[]) =>
+    rows.some((r) => Object.keys(r).some((k) => !SKIP.has(k) && Math.abs(numberValue(r[k] as any)) > 1e-6));
 
-  const rawSystemDispatchRows: TimeSeriesRow[] = (results?.dispatchSeries || []).map(normalizeSeriesPoint);
-  const systemDispatchRows: TimeSeriesRow[] =
-    rawSystemDispatchRows.some((row) =>
-      Object.keys(row).some((key) => !['label', 'timestamp', 'total'].includes(key) && Math.abs(numberValue(row[key] as string | number | undefined)) > 1e-6),
-    )
-      ? rawSystemDispatchRows
-      : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'carrier');
-  const inferredDispatchKeys = Array.from(
-    new Set(systemDispatchRows.flatMap((row) => Object.keys(row).filter((key) => !['label', 'timestamp', 'total'].includes(key)))),
-  );
-  const dispatchKeys =
-    inferredDispatchKeys.length > 0
-      ? inferredDispatchKeys
-      : (results?.carrierMix || []).map((item) => item.label).filter(Boolean);
-  const systemDispatchSeries: TimeSeriesSeries[] = dispatchKeys.map((key) => ({ key, label: key, color: carrierColor(key) }));
+  const sysDispatchRows  = hasValues(rawDispatch)  ? rawDispatch  : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'carrier');
+  const sysGenDispRows   = hasValues(rawGenDisp)   ? rawGenDisp   : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'generator');
+  const sysDispKeys      = Array.from(new Set(sysDispatchRows.flatMap((r) => Object.keys(r).filter((k) => !SKIP.has(k)))));
+  const sysGenDispKeys   = Array.from(new Set(sysGenDispRows.flatMap((r) => Object.keys(r).filter((k) => !SKIP.has(k)))));
+  const sysDispSeries    = sysDispKeys.map((k)    => ({ key: k, label: k, color: carrierColor(k) }));
+  const sysGenDispSeries = sysGenDispKeys.map((k) => ({ key: k, label: k, color: hashColor(k) }));
+  const sysPriceRows     = (results?.systemPriceSeries     || []).map((p) => ({ label: p.label, timestamp: p.timestamp, price: p.value }));
+  const sysEmissionsRows = (results?.systemEmissionsSeries || []).map((p) => ({ label: p.label, timestamp: p.timestamp, emissions: p.value }));
+  const storageRows      = (results?.storageSeries         || []).map((p) => ({ label: p.label, timestamp: p.timestamp, charge: p.charge, discharge: p.discharge, state: p.state }));
+  const sysLoadRows      = buildSystemLoadRows(results);
 
-  const rawSystemGeneratorDispatchRows: TimeSeriesRow[] = (results?.generatorDispatchSeries || []).map(normalizeSeriesPoint);
-  const systemGeneratorDispatchRows: TimeSeriesRow[] =
-    rawSystemGeneratorDispatchRows.some((row) =>
-      Object.keys(row).some((key) => !['label', 'timestamp', 'total'].includes(key) && Math.abs(numberValue(row[key] as string | number | undefined)) > 1e-6),
-    )
-      ? rawSystemGeneratorDispatchRows
-      : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'generator');
-  const generatorDispatchKeys = Array.from(
-    new Set(systemGeneratorDispatchRows.flatMap((row) => Object.keys(row).filter((key) => !['label', 'timestamp', 'total'].includes(key)))),
-  );
-  const systemGeneratorDispatchSeries: TimeSeriesSeries[] = generatorDispatchKeys.map((key) => ({ key, label: key, color: hashColor(key) }));
+  // Stable key for memoisation of focusKeys array
+  const focusKeysSig = focusKeys.join(',');
 
-  const systemPriceRows: TimeSeriesRow[] = (results?.systemPriceSeries || []).map((point) => ({ label: point.label, timestamp: point.timestamp, price: point.value }));
-  const systemEmissionsRows: TimeSeriesRow[] = (results?.systemEmissionsSeries || []).map((point) => ({ label: point.label, timestamp: point.timestamp, emissions: point.value }));
-  const storageRows: TimeSeriesRow[] = (results?.storageSeries || []).map((point) => ({ label: point.label, timestamp: point.timestamp, charge: point.charge, discharge: point.discharge, state: point.state }));
-  const systemLoadRows: TimeSeriesRow[] = buildSystemLoadRows(results);
+  return useMemo(() => {
+    if (!results) return [];
 
-  const buildSingleAssetOptions = (focus: AnalyticsFocus): MetricOption[] =>
-    !results
-      ? []
-      : focus.type === 'generator'
-        ? [
-            { key: 'output', label: 'Output', unit: 'MW', rows: results.assetDetails.generators[focus.key]?.outputSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, output: p.output })) || [], series: [{ key: 'output', label: 'Output MW', color: carrierColor(results.assetDetails.generators[focus.key]?.carrier || 'Other') }], reducer: 'mean', allowDonut: false },
-            { key: 'available', label: 'Available output', unit: 'MW', rows: results.assetDetails.generators[focus.key]?.availableSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, available: p.available })) || [], series: [{ key: 'available', label: 'Available MW', color: '#0f766e' }], reducer: 'mean', allowDonut: false },
-            { key: 'curtailment', label: 'Curtailment', unit: 'MW', rows: results.assetDetails.generators[focus.key]?.curtailmentSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, curtailment: p.curtailment })) || [], series: [{ key: 'curtailment', label: 'Curtailment MW', color: '#f59e0b' }], reducer: 'mean', allowDonut: false },
-            { key: 'emissions', label: 'Emissions', unit: 'tCO2e', rows: results.assetDetails.generators[focus.key]?.emissionsSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, emissions: p.emissions })) || [], series: [{ key: 'emissions', label: 'Emissions tCO2e', color: '#16a34a' }], reducer: 'sum', allowDonut: false },
-          ]
-        : focus.type === 'bus'
-          ? [
-              { key: 'load', label: 'Load', unit: 'MW', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, load: p.load })) || [], series: [{ key: 'load', label: 'Load MW', color: '#f97316' }], reducer: 'mean', allowDonut: false },
-              { key: 'generation', label: 'Generation', unit: 'MW', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, generation: p.generation })) || [], series: [{ key: 'generation', label: 'Generation MW', color: '#2563eb' }], reducer: 'mean', allowDonut: false },
-              { key: 'smp', label: 'SMP', unit: '$/MWh', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, smp: p.smp })) || [], series: [{ key: 'smp', label: 'SMP $/MWh', color: '#111827' }], reducer: 'mean', allowDonut: false },
-              { key: 'emissions', label: 'Emissions', unit: 'tCO2e', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, emissions: p.emissions })) || [], series: [{ key: 'emissions', label: 'Emissions tCO2e', color: '#16a34a' }], reducer: 'sum', allowDonut: false },
-              ...(results.assetDetails.buses[focus.key]?.hasVoltageMagnitude ? [{ key: 'v_mag_pu', label: 'Voltage magnitude', unit: 'p.u.', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_mag_pu: p.v_mag_pu })) || [], series: [{ key: 'v_mag_pu', label: 'Voltage p.u.', color: '#7c3aed' }], reducer: 'mean' as const, allowDonut: false }] : []),
-              ...(results.assetDetails.buses[focus.key]?.hasVoltageAngle ? [{ key: 'v_ang', label: 'Voltage angle', unit: 'deg/rad', rows: results.assetDetails.buses[focus.key]?.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_ang: p.v_ang })) || [], series: [{ key: 'v_ang', label: 'Voltage angle', color: '#8b5cf6' }], reducer: 'mean' as const, allowDonut: false }] : []),
-            ]
-          : focus.type === 'storageUnit'
-            ? [
-                { key: 'dispatch', label: 'Dispatch', unit: 'MW', rows: results.assetDetails.storageUnits[focus.key]?.dispatchSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, dispatch: p.dispatch })) || [], series: [{ key: 'dispatch', label: 'Dispatch MW', color: '#2563eb' }], reducer: 'mean', allowDonut: false },
-                { key: 'storage_power', label: 'Storage power', unit: 'MW', rows: results.assetDetails.storageUnits[focus.key]?.chargeSeries.map((p, i) => ({ label: p.label, timestamp: p.timestamp, charge: p.charge, discharge: results.assetDetails.storageUnits[focus.key]?.dischargeSeries[i]?.discharge || 0 })) || [], series: [{ key: 'charge', label: 'Charge MW', color: '#0ea5e9' }, { key: 'discharge', label: 'Discharge MW', color: '#f97316' }], reducer: 'mean', allowDonut: true },
-                { key: 'state', label: 'State of charge', unit: 'MWh', rows: results.assetDetails.storageUnits[focus.key]?.stateSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, state: p.state })) || [], series: [{ key: 'state', label: 'State MWh', color: '#14b8a6' }], reducer: 'mean', allowDonut: false },
-              ]
-            : focus.type === 'store'
-              ? [
-                  { key: 'energy', label: 'Energy', unit: 'MWh', rows: results.assetDetails.stores[focus.key]?.energySeries.map((p) => ({ label: p.label, timestamp: p.timestamp, energy: p.energy })) || [], series: [{ key: 'energy', label: 'Energy MWh', color: '#7c3aed' }], reducer: 'mean', allowDonut: false },
-                  { key: 'power', label: 'Power', unit: 'MW', rows: results.assetDetails.stores[focus.key]?.powerSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, power: p.power })) || [], series: [{ key: 'power', label: 'Power MW', color: '#6d28d9' }], reducer: 'mean', allowDonut: false },
-                ]
-              : focus.type === 'branch'
-                ? [
-                    { key: 'terminal_flows', label: 'Terminal flows', unit: 'MW', rows: results.assetDetails.branches[focus.key]?.flowSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, p0: p.p0, p1: p.p1 })) || [], series: [{ key: 'p0', label: 'P0 MW', color: '#2563eb' }, { key: 'p1', label: 'P1 MW', color: '#1d4ed8' }], reducer: 'mean', allowDonut: true },
-                    { key: 'loading', label: 'Loading', unit: '%', rows: results.assetDetails.branches[focus.key]?.loadingSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, loading: p.loading })) || [], series: [{ key: 'loading', label: 'Loading %', color: '#ea580c' }], reducer: 'mean', allowDonut: false },
-                    { key: 'losses', label: 'Losses', unit: 'MW', rows: results.assetDetails.branches[focus.key]?.lossesSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, losses: p.losses })) || [], series: [{ key: 'losses', label: 'Losses MW', color: '#dc2626' }], reducer: 'mean', allowDonut: false },
-                  ]
-                : [
-                    { key: 'dispatch', label: 'Dispatch by carrier', unit: 'MW', rows: systemDispatchRows, series: systemDispatchSeries, reducer: 'mean', allowDonut: true },
-                    { key: 'dispatch_by_generator', label: 'Dispatch by generator', unit: 'MW', rows: systemGeneratorDispatchRows, series: systemGeneratorDispatchSeries, reducer: 'mean', allowDonut: true },
-                    { key: 'load', label: 'Total load', unit: 'MW', rows: systemLoadRows, series: [{ key: 'load', label: 'Load MW', color: '#f97316' }], reducer: 'mean', allowDonut: false },
-                    { key: 'system_price', label: 'System marginal price', unit: '$/MWh', rows: systemPriceRows, series: [{ key: 'price', label: 'Price $/MWh', color: '#111827' }], reducer: 'mean', allowDonut: false },
-                    { key: 'system_emissions', label: 'System emissions', unit: 'tCO2e', rows: systemEmissionsRows, series: [{ key: 'emissions', label: 'Emissions tCO2e', color: '#16a34a' }], reducer: 'sum', allowDonut: false },
-                    { key: 'storage_power', label: 'Storage power', unit: 'MW', rows: storageRows, series: [{ key: 'charge', label: 'Charge MW', color: '#0ea5e9' }, { key: 'discharge', label: 'Discharge MW', color: '#f97316' }], reducer: 'mean', allowDonut: true },
-                    { key: 'storage_state', label: 'Storage state of charge', unit: 'MWh', rows: storageRows, series: [{ key: 'state', label: 'State of charge', color: '#14b8a6' }], reducer: 'mean', allowDonut: false },
-                  ];
+    // ── System ────────────────────────────────────────────────────────────────
+    if (focusType === 'system') {
+      return [
+        { key: 'dispatch',          label: 'Dispatch by carrier',       unit: 'MW',     rows: sysDispatchRows,  series: sysDispSeries,                                                                                                                                           reducer: 'mean', allowDonut: true  },
+        { key: 'dispatch_by_gen',   label: 'Dispatch by generator',     unit: 'MW',     rows: sysGenDispRows,   series: sysGenDispSeries,                                                                                                                                        reducer: 'mean', allowDonut: true  },
+        { key: 'load',              label: 'Total load',                 unit: 'MW',     rows: sysLoadRows,      series: [{ key: 'load',      label: 'Load MW',         color: '#f97316' }],                                                                                    reducer: 'mean', allowDonut: false },
+        { key: 'system_price',      label: 'System marginal price',      unit: '$/MWh',  rows: sysPriceRows,     series: [{ key: 'price',     label: 'Price $/MWh',     color: '#111827' }],                                                                                    reducer: 'mean', allowDonut: false },
+        { key: 'system_emissions',  label: 'System emissions',           unit: 'tCO2e',  rows: sysEmissionsRows, series: [{ key: 'emissions', label: 'Emissions tCO2e', color: '#16a34a' }],                                                                                    reducer: 'sum',  allowDonut: false },
+        { key: 'storage_power',     label: 'Storage power',              unit: 'MW',     rows: storageRows,      series: [{ key: 'charge',    label: 'Charge MW',       color: '#0ea5e9' }, { key: 'discharge', label: 'Discharge MW', color: '#f97316' }],                    reducer: 'mean', allowDonut: true  },
+        { key: 'storage_state',     label: 'Storage state of charge',    unit: 'MWh',    rows: storageRows,      series: [{ key: 'state',     label: 'State of charge', color: '#14b8a6' }],                                                                                    reducer: 'mean', allowDonut: false },
+      ];
+    }
 
-  const mergeMetricOptions = (assetKeys: string[], focusType: Exclude<AnalyticsFocus['type'], 'system'>): MetricOption[] => {
-    const byMetric = new Map<string, MetricOption>();
+    const isMulti = focusKeys.length !== 1;
 
-    assetKeys.forEach((assetKey) => {
-      const focus = { type: focusType, key: assetKey } as AnalyticsFocus;
-      buildSingleAssetOptions(focus).forEach((option) => {
-        const merged = byMetric.get(option.key) || {
-          key: option.key,
-          label: option.label,
-          unit: option.unit,
-          rows: [] as TimeSeriesRow[],
-          series: [] as TimeSeriesSeries[],
-          reducer: option.reducer,
-          allowDonut: true,
-        };
-        const rowMap = new Map(
-          merged.rows.map((row) => [`${row.timestamp ?? ''}|${row.label}`, row]),
-        );
+    // ── Single asset ──────────────────────────────────────────────────────────
+    if (!isMulti) {
+      return buildSingleAssetOptions(results.assetDetails, { type: focusType, key: focusKeys[0] } as AnalyticsFocus);
+    }
 
-        option.series.forEach((series) => {
-          const seriesKey = option.series.length === 1
-            ? assetKey
-            : `${assetKey}__${series.key}`;
-          const seriesLabel = option.series.length === 1
-            ? assetKey
-            : `${assetKey} ${series.label}`;
-          if (!merged.series.some((item) => item.key === seriesKey)) {
-            merged.series.push({
-              key: seriesKey,
-              label: seriesLabel,
-              color: hashColor(`${focusType}:${assetKey}:${series.key}`),
-            });
-          }
+    // ── Multi / All ───────────────────────────────────────────────────────────
+    // Resolve "all" (empty array) to every key present in results
+    const allKeys = (() => {
+      switch (focusType) {
+        case 'generator':   return Object.keys(results.assetDetails.generators);
+        case 'bus':         return Object.keys(results.assetDetails.buses);
+        case 'storageUnit': return Object.keys(results.assetDetails.storageUnits);
+        case 'store':       return Object.keys(results.assetDetails.stores);
+        case 'branch':      return Object.keys(results.assetDetails.branches);
+        default:            return [];
+      }
+    })();
+    const resolved = focusKeys.length === 0 ? allKeys : focusKeys;
 
-          option.rows.forEach((row) => {
-            const rowId = `${row.timestamp ?? ''}|${row.label}`;
-            const target = rowMap.get(rowId) || { label: row.label, timestamp: row.timestamp };
-            target[seriesKey] = row[series.key];
-            rowMap.set(rowId, target);
-          });
-        });
-
-        merged.rows = Array.from(rowMap.values());
-        byMetric.set(option.key, merged);
-      });
-    });
-
-    return Array.from(byMetric.values());
-  };
-
-  if (!results) return [];
-  if (
-    analyticsFocus.type !== 'system'
-    && (selectedAssetKeys.length > 1 || analyticsFocus.key === '__all__')
-  ) {
-    return mergeMetricOptions(selectedAssetKeys, analyticsFocus.type);
-  }
-  return buildSingleAssetOptions(analyticsFocus);
+    if (focusType === 'generator') {
+      return buildMultiGenOptions(results.assetDetails, resolved, groupBy);
+    }
+    // Other types: merge by asset name
+    return buildMultiAssetOptions(results.assetDetails, resolved, focusType);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, focusType, focusKeysSig, groupBy,
+      sysDispatchRows, sysDispSeries, sysGenDispRows, sysGenDispSeries,
+      sysLoadRows, sysPriceRows, sysEmissionsRows, storageRows]);
 }

@@ -3,6 +3,7 @@ import {
   AnalyticsFocus,
   ChartSectionConfig,
   ChartSectionType,
+  GroupByOption,
   MetricOption,
   RunResults,
   TimeframeOption,
@@ -18,7 +19,7 @@ import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
 import { TimelineSlider } from '../common/DualRangeSlider';
 import { useMetricOptions } from '../../features/analytics/useMetricOptions';
 
-// ── Component types shown in the selector ─────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 type FocusType = AnalyticsFocus['type'];
 
 const FOCUS_LABELS: Record<FocusType, string> = {
@@ -30,30 +31,73 @@ const FOCUS_LABELS: Record<FocusType, string> = {
   branch:      'Branch',
 };
 
-// Returns the list of asset names for a given focus type from the model
 function assetNamesFor(focusType: FocusType, model: WorkbookModel): string[] {
   switch (focusType) {
-    case 'generator':   return model.generators.map((r) => stringValue(r.name)).filter(Boolean);
-    case 'bus':         return model.buses.map((r) => stringValue(r.name)).filter(Boolean);
+    case 'generator':   return model.generators.map((r)    => stringValue(r.name)).filter(Boolean);
+    case 'bus':         return model.buses.map((r)          => stringValue(r.name)).filter(Boolean);
     case 'storageUnit': return model.storage_units.map((r) => stringValue(r.name)).filter(Boolean);
-    case 'store':       return model.stores.map((r) => stringValue(r.name)).filter(Boolean);
+    case 'store':       return model.stores.map((r)         => stringValue(r.name)).filter(Boolean);
     case 'branch':      return [
-      ...model.lines.map((r) => stringValue(r.name)),
-      ...model.links.map((r) => stringValue(r.name)),
+      ...model.lines.map((r)        => stringValue(r.name)),
+      ...model.links.map((r)        => stringValue(r.name)),
       ...model.transformers.map((r) => stringValue(r.name)),
     ].filter(Boolean);
     default:            return [];
   }
 }
 
-// Build an AnalyticsFocus object from the section's stored type/key
-function sectionFocus(section: ChartSectionConfig): AnalyticsFocus {
-  if (section.focusType === 'system') return { type: 'system' };
-  return { type: section.focusType, key: section.focusKey } as AnalyticsFocus;
+// ── Asset pill multi-select ───────────────────────────────────────────────────
+function AssetPills({
+  assetNames,
+  focusKeys,
+  onChange,
+}: {
+  assetNames: string[];
+  focusKeys: string[];
+  onChange: (keys: string[]) => void;
+}) {
+  const allSelected = focusKeys.length === 0;
+
+  const toggle = (name: string) => {
+    if (allSelected) {
+      // Start with everything selected except the clicked one
+      onChange(assetNames.filter((n) => n !== name));
+    } else if (focusKeys.includes(name)) {
+      const next = focusKeys.filter((k) => k !== name);
+      onChange(next.length === 0 ? [] : next); // empty = all
+    } else {
+      onChange([...focusKeys, name]);
+    }
+  };
+
+  return (
+    <div className="asset-pills">
+      {/* "All" pill */}
+      <button
+        type="button"
+        className={`asset-pill${allSelected ? ' asset-pill--active' : ''}`}
+        onClick={() => onChange([])}
+      >
+        All
+      </button>
+      {assetNames.map((name) => {
+        const active = allSelected || focusKeys.includes(name);
+        return (
+          <button
+            key={name}
+            type="button"
+            className={`asset-pill${active ? ' asset-pill--active' : ''}`}
+            onClick={() => toggle(name)}
+          >
+            {name}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-
 export function UserDefinedChartCard({
   section,
   results,
@@ -72,19 +116,21 @@ export function UserDefinedChartCard({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
-  // Per-card metric options derived from the card's own focusType/focusKey
-  const focus = sectionFocus(section);
   const assetNames = assetNamesFor(section.focusType, model);
-  const selectedAssetKeys = section.focusType === 'system'
-    ? []
-    : section.focusKey === '__all__'
-      ? assetNames
-      : (section.focusKey ? [section.focusKey] : []);
-  const metricOptions: MetricOption[] = useMetricOptions(results, model, focus, selectedAssetKeys);
 
-  const metric = metricOptions.find((item) => item.key === section.metricKey);
-  const hasMetric = Boolean(metric);
+  // Per-card metric options from the card's own focus/keys/groupBy
+  const metricOptions: MetricOption[] = useMetricOptions(
+    results,
+    model,
+    section.focusType,
+    section.focusKeys,
+    section.groupBy,
+  );
+
+  const metric     = metricOptions.find((m) => m.key === section.metricKey);
+  const hasMetric  = Boolean(metric);
   const metricRows = metric?.rows || [];
+
   const safeStart = hasMetric
     ? clamp(Math.min(section.startIndex, section.endIndex), 0, Math.max(metricRows.length - 1, 0))
     : 0;
@@ -95,71 +141,62 @@ export function UserDefinedChartCard({
     ? aggregateMetricRows(metric!, safeStart, safeEnd, section.timeframe)
     : [];
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // Show Group by only when: non-system, multi/all selected, generator type (carriers meaningful)
+  const isMultiOrAll  = section.focusType !== 'system' && section.focusKeys.length !== 1;
+  const showGroupBy   = isMultiOrAll && section.focusType === 'generator';
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const resetMetric = (extra: Partial<ChartSectionConfig> = {}) =>
+    onChange({ ...section, metricKey: EMPTY_METRIC_KEY, startIndex: 0, endIndex: 0, ...extra });
 
   const handleFocusTypeChange = (newType: FocusType) => {
-    const firstAsset = assetNamesFor(newType, model)[0] || '';
-    onChange({
-      ...section,
+    const names = assetNamesFor(newType, model);
+    resetMetric({
       focusType: newType,
-      focusKey: newType === 'system' ? '' : firstAsset,
-      metricKey: EMPTY_METRIC_KEY,
-      startIndex: 0,
-      endIndex: 0,
+      focusKeys: newType === 'system' ? [] : [],  // start with "All" for non-system too
+      groupBy: 'carrier',
     });
-  };
-
-  const handleFocusKeyChange = (newKey: string) => {
-    onChange({
-      ...section,
-      focusKey: newKey,
-      metricKey: EMPTY_METRIC_KEY,
-      startIndex: 0,
-      endIndex: 0,
-    });
+    void names; // suppress lint
   };
 
   const handleMetricChange = (newKey: string) => {
-    const newMetric = metricOptions.find((m) => m.key === newKey);
-    const len = newMetric?.rows.length || 1;
-    onChange({
-      ...section,
-      metricKey: newKey,
-      startIndex: 0,
-      endIndex: Math.max(len - 1, 0),
-    });
+    const m   = metricOptions.find((x) => x.key === newKey);
+    const len = m?.rows.length || 1;
+    onChange({ ...section, metricKey: newKey, startIndex: 0, endIndex: Math.max(len - 1, 0) });
   };
 
   const handleExport = () => {
     if (!metric) return;
     let promise: Promise<void>;
     if (section.chartType === 'donut') {
-      const donutData = buildDonutFromMetric(metric, safeStart, safeEnd);
+      const data = buildDonutFromMetric(metric, safeStart, safeEnd);
       promise = exportChartToExcel(
         metric.label,
         ['label', 'value'],
-        donutData.map((d) => ({ label: d.label, value: d.value })),
+        data.map((d) => ({ label: d.label, value: d.value })),
         chartContainerRef.current,
       );
     } else {
-      const seriesKeys = metric.series.map((s) => s.key);
-      const headers = ['timestamp', ...seriesKeys];
-      const rows = aggregatedRows.map((r) => {
+      const keys    = metric.series.map((s) => s.key);
+      const headers = ['timestamp', ...keys];
+      const rows    = aggregatedRows.map((r) => {
         const row: Record<string, unknown> = { timestamp: r.timestamp ?? r.label };
-        seriesKeys.forEach((k) => { row[k] = numberValue(r[k] as number | string | undefined); });
+        keys.forEach((k) => { row[k] = numberValue(r[k] as any); });
         return row;
       });
       promise = exportChartToExcel(metric.label, headers, rows, chartContainerRef.current);
     }
     promise
       .then(() => showToast(`Exported ${metric.label}`, 'success'))
-      .catch(() => showToast('Export failed', 'error'));
+      .catch(()  => showToast('Export failed', 'error'));
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <section className="chart-card chart-builder-card">
+
+      {/* header row */}
       <div className="chart-card-header chart-card-controls">
         <div>
           <h3>{hasMetric ? metric!.label : 'Empty chart'}</h3>
@@ -167,23 +204,17 @@ export function UserDefinedChartCard({
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {hasMetric && (
-            <button
-              className="ghost-button chart-export-btn"
-              title="Export data and chart to Excel"
-              onClick={handleExport}
-            >
-              ⬇ Export
-            </button>
+            <button className="ghost-button chart-export-btn" onClick={handleExport}>⬇ Export</button>
           )}
           <button className="ghost-button" onClick={onClean}>Clean</button>
           <button className="ghost-button" style={{ color: '#dc2626' }} onClick={onRemove}>Remove</button>
         </div>
       </div>
 
-      {/* ── Controls row ─────────────────────────────────────────────── */}
+      {/* controls row */}
       <div className="chart-builder-controls">
 
-        {/* Component type */}
+        {/* Component */}
         <label className="chart-control">
           <span>Component</span>
           <select
@@ -198,22 +229,6 @@ export function UserDefinedChartCard({
           </select>
         </label>
 
-        {/* Asset name sub-selector (hidden for system) */}
-        {section.focusType !== 'system' && assetNames.length > 0 && (
-          <label className="chart-control">
-            <span>Asset</span>
-            <select
-              value={section.focusKey}
-              onChange={(e) => handleFocusKeyChange(e.target.value)}
-            >
-              <option value="__all__">All</option>
-              {assetNames.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
         {/* Value */}
         <label className="chart-control">
           <span>Value</span>
@@ -223,13 +238,29 @@ export function UserDefinedChartCard({
             disabled={!results}
           >
             <option value={EMPTY_METRIC_KEY}>Select value</option>
-            {metricOptions.map((item) => (
-              <option key={item.key} value={item.key}>{item.label}</option>
+            {metricOptions.map((m) => (
+              <option key={m.key} value={m.key}>{m.label}</option>
             ))}
           </select>
         </label>
 
-        {/* Temporal resolution (was "Group") */}
+        {/* Group by — only for generator multi/all */}
+        {showGroupBy && (
+          <label className="chart-control">
+            <span>Group by</span>
+            <select
+              value={section.groupBy}
+              onChange={(e) =>
+                onChange({ ...section, groupBy: e.target.value as GroupByOption, metricKey: EMPTY_METRIC_KEY, startIndex: 0, endIndex: 0 })
+              }
+            >
+              <option value="carrier">Carrier</option>
+              <option value="asset">Asset</option>
+            </select>
+          </label>
+        )}
+
+        {/* Temporal resolution */}
         <label className="chart-control">
           <span>Temporal resolution</span>
           <select
@@ -276,7 +307,19 @@ export function UserDefinedChartCard({
         )}
       </div>
 
-      {/* ── Timeline slider ──────────────────────────────────────────── */}
+      {/* Asset pill multi-select (hidden for system) */}
+      {section.focusType !== 'system' && assetNames.length > 0 && (
+        <div className="chart-control-row">
+          <span className="chart-control-label">Assets</span>
+          <AssetPills
+            assetNames={assetNames}
+            focusKeys={section.focusKeys}
+            onChange={(keys) => resetMetric({ focusKeys: keys })}
+          />
+        </div>
+      )}
+
+      {/* Timeline slider */}
       {hasMetric && (
         <TimelineSlider
           data={metric!.rows}
@@ -286,32 +329,26 @@ export function UserDefinedChartCard({
         />
       )}
 
-      {/* ── Chart area ───────────────────────────────────────────────── */}
+      {/* Chart */}
       <div ref={chartContainerRef}>
         {!hasMetric ? (
           <div className="chart-empty-state">
-            <p className="empty-text">
-              Choose a component, value, temporal resolution, and chart type for this section.
-            </p>
+            <p className="empty-text">Choose component, assets, value and chart type.</p>
           </div>
         ) : section.chartType === 'donut' ? (
           <section className="chart-card">
             <div className="chart-card-header">
-              <div>
-                <h3>{metric!.label}</h3>
-                <p>{`average ${metric!.unit} over selected time window`}</p>
-              </div>
+              <div><h3>{metric!.label}</h3><p>average {metric!.unit} over window</p></div>
             </div>
-            {buildDonutFromMetric(metric!, safeStart, safeEnd).length > 0 ? (
-              <DonutChart data={buildDonutFromMetric(metric!, safeStart, safeEnd)} />
-            ) : (
-              <p className="empty-text">No aggregated values available for the current selection.</p>
-            )}
+            {buildDonutFromMetric(metric!, safeStart, safeEnd).length > 0
+              ? <DonutChart data={buildDonutFromMetric(metric!, safeStart, safeEnd)} />
+              : <p className="empty-text">No data for current selection.</p>
+            }
           </section>
         ) : (
           <InteractiveTimeSeriesCard
             title={metric!.label}
-            description={`${section.timeframe} ${metric!.unit}`}
+            description={`${section.timeframe} · ${metric!.unit}`}
             data={aggregatedRows}
             series={metric!.series}
             mode={section.chartType}

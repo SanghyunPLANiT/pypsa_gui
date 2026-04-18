@@ -396,7 +396,8 @@ function AppInner() {
       {
         id: 1,
         focusType: 'system',
-        focusKey: '',
+        focusKeys: [],
+        groupBy: 'carrier',
         metricKey: 'dispatch',
         chartType: 'area',
         timeframe: 'hourly',

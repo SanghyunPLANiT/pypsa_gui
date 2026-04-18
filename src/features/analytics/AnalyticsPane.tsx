@@ -249,7 +249,7 @@ export function AnalyticsPane({
             <button className="ghost-button" onClick={() => {
               setChartSections((current) => [
                 ...current,
-                { id: Date.now(), focusType: 'system', focusKey: '', metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false },
+                { id: Date.now(), focusType: 'system', focusKeys: [], groupBy: 'carrier', metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false },
               ]);
             }}>Add Chart</button>
           </div>
@@ -267,7 +267,7 @@ export function AnalyticsPane({
               onChange={(next) => setChartSections((current) => current.map((item) => (item.id === section.id ? next : item)))}
               onClean={() => setChartSections((current) => current.map((item) =>
                 item.id === section.id
-                  ? { ...item, focusType: 'system', focusKey: '', metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false }
+                  ? { ...item, focusType: 'system', focusKeys: [], groupBy: 'carrier' as const, metricKey: EMPTY_METRIC_KEY, chartType: 'line', timeframe: 'hourly', startIndex: 0, endIndex: 0, stacked: false }
                   : item,
               ))}
               onRemove={() => setChartSections((current) => current.filter((item) => item.id !== section.id))}

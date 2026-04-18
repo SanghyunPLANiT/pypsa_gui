@@ -924,6 +924,50 @@ button {
   min-width: 150px;
 }
 
+/* Asset pill row */
+.chart-control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.chart-control-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.asset-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 88px;
+  overflow-y: auto;
+}
+
+.asset-pill {
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--fg);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.asset-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.asset-pill--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .chart-control span,
 .chart-time-controls span,
 .focus-chip span {
