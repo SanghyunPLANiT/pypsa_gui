@@ -8,8 +8,24 @@ function makeAppendSheet(wb: XLSX.WorkBook) {
   return (name: string, data: Record<string, unknown>[]) => {
     if (!data || data.length === 0) return;
     const ws = XLSX.utils.json_to_sheet(data);
+    autoFitCols(ws);
     XLSX.utils.book_append_sheet(wb, ws, name);
   };
+}
+
+/** Set column widths based on max content length (capped at 40 chars). */
+function autoFitCols(ws: XLSX.WorkSheet) {
+  const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1');
+  const colWidths: number[] = [];
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell) continue;
+      const len = String(cell.v ?? '').length;
+      colWidths[C] = Math.min(40, Math.max(colWidths[C] ?? 8, len));
+    }
+  }
+  ws['!cols'] = colWidths.map((w) => ({ wch: w }));
 }
 
 function pivotSeries(
@@ -114,6 +130,63 @@ export function exportFullResults(
     })),
   );
   appendSheet('OUT_BranchFlow', branchRows);
+
+  // Merit order
+  if (results.meritOrder && results.meritOrder.length > 0) {
+    appendSheet('OUT_MeritOrder', results.meritOrder.map((e) => ({
+      name: e.name,
+      carrier: e.carrier,
+      bus: e.bus,
+      marginal_cost: e.marginal_cost,
+      p_nom_MW: e.p_nom,
+      cumulative_MW: e.cumulative_mw,
+    })));
+  }
+
+  // Capacity expansion
+  if (results.expansionResults && results.expansionResults.length > 0) {
+    appendSheet('OUT_Expansion', results.expansionResults.map((e) => ({
+      name: e.name,
+      component: e.component,
+      carrier: e.carrier,
+      bus: e.bus,
+      p_nom_MW: e.p_nom_mw,
+      p_nom_opt_MW: e.p_nom_opt_mw,
+      delta_MW: e.delta_mw,
+      capital_cost: e.capital_cost,
+      capex_annual: e.capex_annual,
+    })));
+  }
+
+  // Emissions breakdown
+  if (results.emissionsBreakdown) {
+    appendSheet('OUT_EmissionsByGen', results.emissionsBreakdown.byGenerator.map((e) => ({
+      name: e.name,
+      carrier: e.carrier,
+      bus: e.bus,
+      energy_MWh: e.energy_mwh,
+      emissions_tCO2: e.emissions_tco2,
+      intensity_kg_MWh: e.intensity_kg_mwh,
+    })));
+    appendSheet('OUT_EmissionsByCarrier', results.emissionsBreakdown.byCarrier.map((e) => ({
+      carrier: e.carrier,
+      energy_MWh: e.energy_mwh,
+      emissions_tCO2: e.emissions_tco2,
+      intensity_kg_MWh: e.intensity_kg_mwh,
+    })));
+  }
+
+  // CO2 shadow price
+  if (results.co2Shadow && results.co2Shadow.found) {
+    appendSheet('OUT_CO2Shadow', [{
+      constraint_name: results.co2Shadow.constraint_name ?? '',
+      shadow_price: results.co2Shadow.shadow_price,
+      explicit_price: results.co2Shadow.explicit_price,
+      cap_ktco2: results.co2Shadow.cap_ktco2 ?? '',
+      status: results.co2Shadow.status,
+      note: results.co2Shadow.note,
+    }]);
+  }
 
   const ts = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
   XLSX.writeFile(wb, `${baseFilename}_${ts}.xlsx`);

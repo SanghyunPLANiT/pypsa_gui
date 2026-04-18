@@ -90,6 +90,7 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
+  onExportAll?: () => void;
 }
 
 export function ResultsDashboard({
@@ -99,6 +100,7 @@ export function ResultsDashboard({
   systemLoadRows,
   systemPriceRows,
   storageRows,
+  onExportAll,
 }: Props) {
   const { showToast } = useToast();
 
@@ -192,6 +194,14 @@ export function ResultsDashboard({
 
   return (
     <div className="results-dashboard">
+      {onExportAll && (
+        <div className="dashboard-export-header">
+          <span className="dashboard-export-title">Results dashboard</span>
+          <button className="ghost-button" onClick={onExportAll} title="Download all results as Excel">
+            ⬇ Export all results
+          </button>
+        </div>
+      )}
       {/* KPI strip */}
       <div className="kpi-strip">
         <KpiCard label="Total dispatch" value={Math.round(totalDispatch).toLocaleString()} unit="MWh" />

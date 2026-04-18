@@ -136,6 +136,67 @@ export function useModelIssues(model: WorkbookModel): ModelIssue[] {
       else if (!busNames.has(b1)) issues.push({ sheet: 'transformers', rowIndex: i, col: 'bus1', severity: 'error', message: `bus1 "${b1}" not found in buses` });
     });
 
+    // ── Time-series sheets ────────────────────────────────────────────────
+    const snapshotCount = model.snapshots.length;
+
+    // Helper: check TS sheet for value range and row-count mismatches.
+    // Reports one issue per column (not per row) to avoid flooding the list.
+    const checkTsSheet = (
+      sheetKey: keyof typeof model,
+      label: string,
+      minVal: number | null,
+      maxVal: number | null,
+    ) => {
+      const tsRows = model[sheetKey] as Row[];
+      if (!tsRows || tsRows.length === 0) return;
+
+      // Row-count check
+      if (snapshotCount > 0 && tsRows.length !== snapshotCount) {
+        issues.push({
+          sheet: sheetKey as string,
+          rowIndex: 0,
+          severity: 'warning',
+          message: `Row count ${tsRows.length} ≠ snapshot count ${snapshotCount}`,
+        });
+      }
+
+      // Per-column range check — report only the first offending row per column
+      const ignoreCols = new Set(['snapshot', 'name', 'datetime', 'timestep', 'period', '']);
+      const cols = Object.keys(tsRows[0]).filter((c) => !ignoreCols.has(c.toLowerCase()));
+
+      cols.forEach((col) => {
+        let firstBadRow = -1;
+        let badCount = 0;
+        for (let i = 0; i < tsRows.length; i++) {
+          const raw = tsRows[i][col];
+          if (raw === null || raw === '' || raw === undefined) continue;
+          const v = numberValue(raw);
+          if ((minVal !== null && v < minVal) || (maxVal !== null && v > maxVal)) {
+            if (firstBadRow === -1) firstBadRow = i;
+            badCount++;
+          }
+        }
+        if (firstBadRow !== -1) {
+          const rangeStr = minVal !== null && maxVal !== null
+            ? `[${minVal}, ${maxVal}]`
+            : minVal !== null ? `≥ ${minVal}` : `≤ ${maxVal}`;
+          issues.push({
+            sheet: sheetKey as string,
+            rowIndex: firstBadRow,
+            col,
+            severity: 'warning',
+            message: `"${col}": ${badCount} value${badCount > 1 ? 's' : ''} outside ${rangeStr}${badCount > 1 ? ` (first at row ${firstBadRow + 1})` : ''}`,
+          });
+        }
+      });
+    };
+
+    checkTsSheet('generators-p_max_pu', 'generators-p_max_pu', 0, 1);
+    checkTsSheet('generators-p_min_pu', 'generators-p_min_pu', 0, 1);
+    checkTsSheet('loads-p_set', 'loads-p_set', 0, null);
+    checkTsSheet('storage_units-inflow', 'storage_units-inflow', 0, null);
+    checkTsSheet('links-p_max_pu', 'links-p_max_pu', 0, 1);
+
     return issues;
   }, [model]);
 }

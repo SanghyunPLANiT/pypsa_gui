@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 
 import {
@@ -67,8 +67,29 @@ function AppInner() {
   const [status, setStatus] = useState('Ready. Open a workbook or try the demo model.');
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
   const [jumpTo, setJumpTo] = useState<{ sheet: string; rowIndex: number } | null>(null);
+  const [runElapsed, setRunElapsed] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const runStartRef = useRef<number>(0);
 
   const modelIssues = useModelIssues(model);
+
+  // Elapsed-time ticker while running
+  useEffect(() => {
+    if (runStatus !== 'running') { setRunElapsed(0); return; }
+    runStartRef.current = Date.now();
+    const id = setInterval(
+      () => setRunElapsed(Math.floor((Date.now() - runStartRef.current) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [runStatus]);
+
+  const handleCancelRun = useCallback(() => {
+    abortRef.current?.abort();
+    setRunStatus('idle');
+    setStatus('Run cancelled.');
+    showToast('Run cancelled', 'info');
+  }, [showToast]);
   const [filename, setFilename] = useState('ragnarok_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -302,11 +323,14 @@ function AppInner() {
 
     setRunStatus('running');
     setStatus(`Running — ${snapshotCount} snapshots…`);
+    const abort = new AbortController();
+    abortRef.current = abort;
     try {
       const response = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(runOptions),
+        signal: abort.signal,
       });
       if (!response.ok) {
         const message = await response.text();
@@ -350,6 +374,7 @@ function AppInner() {
         return next;
       });
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return; // cancelled — already handled
       const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
       setRunStatus('error');
       setStatus(msg);
@@ -593,6 +618,10 @@ function AppInner() {
                     storageRows={storageRows}
                     runHistory={runHistory}
                     subTab={analyticsSubTab}
+                    onExportAll={() => {
+                      exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
+                      showToast('Full results exported to Excel', 'success');
+                    }}
                   />
                 )
               )}
@@ -600,6 +629,21 @@ function AppInner() {
           )}
         </div>
       </div>
+
+      {/* ── Run progress overlay ── */}
+      {runStatus === 'running' && (
+        <div className="run-overlay">
+          <div className="run-overlay-card">
+            <div className="run-spinner" />
+            <div className="run-overlay-title">Solving model…</div>
+            <div className="run-overlay-elapsed">
+              {Math.floor(runElapsed / 60) > 0 ? `${Math.floor(runElapsed / 60)}m ` : ''}
+              {(runElapsed % 60).toString().padStart(2, '0')}s elapsed
+            </div>
+            <button className="secondary-button" onClick={handleCancelRun}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Run dialog ── */}
       <RunDialog

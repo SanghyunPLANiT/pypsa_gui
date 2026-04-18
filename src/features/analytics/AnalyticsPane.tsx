@@ -30,6 +30,7 @@ interface Props {
   storageRows: TimeSeriesRow[];
   runHistory: RunHistoryEntry[];
   subTab: AnalyticsSubTab;
+  onExportAll?: () => void;
 }
 
 function EmptyAnalytics() {
@@ -53,6 +54,7 @@ export function AnalyticsPane({
   systemLoadRows, systemPriceRows, storageRows,
   runHistory,
   subTab,
+  onExportAll,
 }: Props) {
   const focusTitle =
     analyticsFocus.type === 'system' ? 'System analytics' : analyticsFocus.key;
@@ -141,6 +143,7 @@ export function AnalyticsPane({
           systemLoadRows={systemLoadRows}
           systemPriceRows={systemPriceRows}
           storageRows={storageRows}
+          onExportAll={onExportAll}
         />
       )}
 
