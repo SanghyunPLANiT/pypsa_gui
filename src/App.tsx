@@ -454,7 +454,7 @@ function AppInner() {
         <div className="topbar-left">
           <span className="topbar-brand">Ragnarok</span>
           <div className="topbar-divider" />
-          <button className="run-button" onClick={() => setRunDialogOpen(true)}>▶ Run</button>
+          <button className="run-button" onClick={() => setRunDialogOpen(true)}>Run</button>
           <button className="tb-btn" onClick={handleOpenWorkbook}>Open</button>
           <div className="topbar-divider" />
           <span className="topbar-file">{filename}</span>
@@ -473,7 +473,7 @@ function AppInner() {
               {item}
               {item === 'Analytics' && validateResult && (
                 <span className={`tab-badge ${validateResult.valid ? 'tab-badge--ok' : 'tab-badge--error'}`}>
-                  {validateResult.valid ? '✓' : `${validateResult.errors.length + validateResult.warnings.length}`}
+                  {validateResult.valid ? 'ok' : `${validateResult.errors.length + validateResult.warnings.length}`}
                 </span>
               )}
             </button>
@@ -485,7 +485,7 @@ function AppInner() {
       <div className="workspace-body">
         <aside className={`app-sidebar${sidebarOpen ? '' : ' app-sidebar--collapsed'}`}>
           <button className="sidebar-toggle" onClick={() => setSidebarOpen((o) => !o)} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
-            {sidebarOpen ? '◂' : '▸'}
+            {sidebarOpen ? '<' : '>'}
           </button>
           {sidebarOpen && (
             <Sidebar
@@ -571,7 +571,7 @@ function AppInner() {
                       )}
                       {s === 'Validation' && modelIssues.filter(i => i.severity === 'error').length === 0 && validateResult && (
                         <span className={`tab-badge ${validateResult.valid ? 'tab-badge--ok' : 'tab-badge--error'}`}>
-                          {validateResult.valid ? '✓' : validateResult.errors.length + validateResult.warnings.length}
+                          {validateResult.valid ? 'ok' : validateResult.errors.length + validateResult.warnings.length}
                         </span>
                       )}
                     </button>

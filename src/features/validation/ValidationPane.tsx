@@ -23,7 +23,7 @@ interface Props {
 function IssueItem({ issue, onNavigate }: { issue: ModelIssue; onNavigate: (sheet: string, rowIndex: number) => void }) {
   return (
     <li className={`vi-item vi-item--${issue.severity}`}>
-      <span className="vi-icon">{issue.severity === 'error' ? '✕' : '⚠'}</span>
+      <span className="vi-icon">{issue.severity === 'error' ? 'error' : 'warn'}</span>
       <span className="vi-body">
         <button
           className="vi-loc"

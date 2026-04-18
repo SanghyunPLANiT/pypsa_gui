@@ -281,7 +281,7 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate }: 
           <span>
             Showing <strong>{filteredRows.length}</strong> of {rows.length} rows
           </span>
-          <button className="ghost-button sm" onClick={clearAll}>✕ Clear all filters</button>
+          <button className="ghost-button sm" onClick={clearAll}>Clear all filters</button>
         </div>
       )}
       <table className="spreadsheet-table">
@@ -312,7 +312,7 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate }: 
                         openDropdown(c);
                       }}
                     >
-                      ▾
+                      v
                     </button>
                   </div>
                 </th>
@@ -523,7 +523,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
                       className={`nav-item ts-item${tsActive ? ' active' : ''}`}
                       onClick={() => setSel({ kind: 'ts', sheet: g.tsSheet! })}
                     >
-                      <span className="nav-item-icon">⏱</span>
+                      <span className="nav-item-icon">t</span>
                       <span className="nav-item-label">temporal</span>
                       <span className={`nav-count${tsRows.length > 0 ? ' has-data' : ''}`}>
                         {tsRows.length > 0 ? `${tsRows.length}t` : '—'}
@@ -563,7 +563,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
               onChange={handleCsvFile}
             />
             <button className="ghost-button sm" onClick={() => csvInputRef.current?.click()}>
-              📥 Import CSV
+              Import CSV
             </button>
             {rows.length > 0 && (
               <span className="ts-row-count">{rows.length} rows loaded</span>

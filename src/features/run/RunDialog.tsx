@@ -195,7 +195,7 @@ export function RunDialog({
 
         <div className="run-carbon-row">
           <label className="run-carbon-label" htmlFor="run-carbon-price">
-            <span>💨 Carbon price</span>
+            <span>Carbon price</span>
             <span className="run-carbon-unit">$/tCO₂</span>
           </label>
           <input

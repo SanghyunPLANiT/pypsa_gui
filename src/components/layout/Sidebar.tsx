@@ -75,9 +75,9 @@ function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: RunHistory
             title={entry.pinned ? 'Unpin' : "Pin — won't auto-expire"}
             onClick={() => onPin(!entry.pinned)}
           >
-            📌
+            {entry.pinned ? 'Unpin' : 'Pin'}
           </button>
-          <button className="hist-delete-btn" title="Delete" onClick={onDelete}>✕</button>
+          <button className="hist-delete-btn" title="Delete" onClick={onDelete}>x</button>
         </div>
       </div>
 
@@ -90,10 +90,10 @@ function RunHistoryCard({ entry, onView, onRename, onPin, onDelete }: RunHistory
       <div className="hist-settings">
         <span>{entry.results.runMeta.snapshotCount} snaps</span>
         <span>{entry.snapshotWeight}h</span>
-        {entry.carbonPrice > 0 && <span>💨 ${entry.carbonPrice}/t</span>}
+        {entry.carbonPrice > 0 && <span>${entry.carbonPrice}/t CO₂</span>}
         {entry.activeConstraints.length > 0 && (
           <span title={entry.activeConstraints.map((c) => c.label).join(', ')}>
-            ⛓ {entry.activeConstraints.length}
+            {entry.activeConstraints.length} constraint{entry.activeConstraints.length > 1 ? 's' : ''}
           </span>
         )}
       </div>
@@ -161,7 +161,7 @@ export function Sidebar({
 
   return (
     <>
-      <SidebarGroup title="File" icon="📁" defaultOpen>
+      <SidebarGroup title="File" defaultOpen>
         <div className="sg-btn-grid">
           <button className="tb-btn sg-full" onClick={onOpen}>Open</button>
           <button className="tb-btn sg-full" onClick={onSave}>Save</button>
@@ -180,7 +180,6 @@ export function Sidebar({
 
       <SidebarGroup
         title="Constraints"
-        icon="⛓"
         badge={
           constraints.filter((c) => c.enabled).length > 0
             ? <span className="sg-badge">{constraints.filter((c) => c.enabled).length}</span>
@@ -195,7 +194,7 @@ export function Sidebar({
       </SidebarGroup>
 
       {results && (
-        <SidebarGroup title="Results" icon="📊" defaultOpen>
+        <SidebarGroup title="Results" defaultOpen>
           <div className="sg-summary">
             {results.summary.map((s) => (
               <div key={s.label} className="sg-summary-item">
@@ -211,7 +210,6 @@ export function Sidebar({
       {runHistory.length > 0 && (
         <SidebarGroup
           title="History"
-          icon="🕓"
           badge={<span className="sg-badge">{runHistory.length}</span>}
         >
           <div className="hist-list">
@@ -227,7 +225,7 @@ export function Sidebar({
             ))}
           </div>
           <p className="hist-footnote">
-            Last {MAX_UNPINNED} runs kept · pin 📌 to preserve
+            Last {MAX_UNPINNED} runs kept · pin to preserve
           </p>
         </SidebarGroup>
       )}

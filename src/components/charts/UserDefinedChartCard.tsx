@@ -204,7 +204,7 @@ export function UserDefinedChartCard({
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {hasMetric && (
-            <button className="ghost-button chart-export-btn" onClick={handleExport}>⬇ Export</button>
+            <button className="ghost-button chart-export-btn" onClick={handleExport}>Export</button>
           )}
           <button className="ghost-button" onClick={onClean}>Clean</button>
           <button className="ghost-button" style={{ color: '#dc2626' }} onClick={onRemove}>Remove</button>

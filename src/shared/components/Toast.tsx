@@ -27,9 +27,9 @@ export function useToast() {
 const TOAST_DURATION = 3500;
 
 const ICONS: Record<ToastType, string> = {
-  success: '✓',
-  error: '✕',
-  info: 'ℹ',
+  success: 'ok',
+  error: 'err',
+  info: 'i',
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -81,7 +81,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     >
       <span className="toast-icon">{ICONS[toast.type]}</span>
       <span className="toast-message">{toast.message}</span>
-      <button className="toast-close" onClick={onDismiss} aria-label="Dismiss">×</button>
+      <button className="toast-close" onClick={onDismiss} aria-label="Dismiss">x</button>
     </div>
   );
 }

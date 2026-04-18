@@ -65,7 +65,7 @@ export function RunComparisonTable({ runHistory, activeResults, onToggleComparis
                       title="Remove from comparison (keeps run in history)"
                       onClick={() => onToggleComparison(entry.id, false)}
                     >
-                      ✕
+                      x
                     </button>
                   )}
                 </div>

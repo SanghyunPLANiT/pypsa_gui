@@ -16,7 +16,7 @@ export function SidebarGroup({
         {icon && <span className="sg-icon">{icon}</span>}
         <span className="sg-title">{title}</span>
         {badge}
-        <span className={`sg-chevron${open ? ' is-open' : ''}`}>▾</span>
+        <span className={`sg-chevron${open ? ' is-open' : ''}`}>{open ? '-' : '+'}</span>
       </button>
       {open && <div className="sg-body">{children}</div>}
     </div>

@@ -129,7 +129,7 @@ export function MapDetailCard({ focus, results, onClose }: Props) {
           <span className="mdc-title" title={key}>{key}</span>
           {subtitle && <span className="mdc-badge">{subtitle}</span>}
         </div>
-        <button className="mdc-close" onClick={onClose} title="Close (reset focus)">✕</button>
+        <button className="mdc-close" onClick={onClose} title="Close (reset focus)">Close</button>
       </div>
 
       {/* KPIs */}

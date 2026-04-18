@@ -87,7 +87,7 @@ export function GlobalConstraintsSection({
                 )}
                 <input className="gcc-val" type="number" value={c.value} onChange={(e) => update(c.id, { value: parseFloat(e.target.value) || 0 })} />
                 <span className="gcc-unit">{c.unit}</span>
-                <button className="gcc-del" onClick={() => onChange(constraints.filter((x) => x.id !== c.id))}>✕</button>
+                <button className="gcc-del" onClick={() => onChange(constraints.filter((x) => x.id !== c.id))}>x</button>
               </div>
             );
           })}

@@ -299,7 +299,7 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, ro
           <span>
             Showing <strong>{filteredRows.length}</strong> of {rows.length} rows
           </span>
-          <button className="ghost-button sm" onClick={clearAll}>✕ Clear all filters</button>
+          <button className="ghost-button sm" onClick={clearAll}>Clear all filters</button>
         </div>
       )}
       <table className="spreadsheet-table">
@@ -330,7 +330,7 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, ro
                         openDropdown(c);
                       }}
                     >
-                      ▾
+                      v
                     </button>
                   </div>
                 </th>
@@ -593,7 +593,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
                       className={`nav-item ts-item${tsActive ? ' active' : ''}`}
                       onClick={() => setSel({ kind: 'ts', sheet: g.tsSheet! })}
                     >
-                      <span className="nav-item-icon">⏱</span>
+                      <span className="nav-item-icon">t</span>
                       <span className="nav-item-label">temporal</span>
                       <span className={`nav-count${tsRows.length > 0 ? ' has-data' : ''}`}>
                         {tsRows.length > 0 ? `${tsRows.length}t` : '—'}

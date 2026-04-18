@@ -53,7 +53,7 @@ function DashboardSection({ title, defaultOpen = true, onExport, children }: Sec
         >
           <h3>{title}</h3>
           <span style={{ fontSize: '0.75rem', color: 'var(--muted)', userSelect: 'none' }}>
-            {open ? '▲' : '▼'}
+            {open ? '-' : '+'}
           </span>
         </button>
         {onExport && (
@@ -63,7 +63,7 @@ function DashboardSection({ title, defaultOpen = true, onExport, children }: Sec
             title="Export data and chart to Excel"
             onClick={(e) => { e.stopPropagation(); onExport(); }}
           >
-            ⬇ Export
+            Export
           </button>
         )}
       </div>
@@ -198,7 +198,7 @@ export function ResultsDashboard({
         <div className="dashboard-export-header">
           <span className="dashboard-export-title">Results dashboard</span>
           <button className="ghost-button" onClick={onExportAll} title="Download all results as Excel">
-            ⬇ Export all results
+            Export all results
           </button>
         </div>
       )}
