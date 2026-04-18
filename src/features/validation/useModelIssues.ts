@@ -108,6 +108,19 @@ export function useModelIssues(model: WorkbookModel): ModelIssue[] {
       else if (!busNames.has(b0)) issues.push({ sheet: 'links', rowIndex: i, col: 'bus0', severity: 'error', message: `bus0 "${b0}" not found in buses` });
       if (!b1) issues.push({ sheet: 'links', rowIndex: i, col: 'bus1', severity: 'error', message: 'bus1 is empty' });
       else if (!busNames.has(b1)) issues.push({ sheet: 'links', rowIndex: i, col: 'bus1', severity: 'error', message: `bus1 "${b1}" not found in buses` });
+      // Multi-output bus references (sector coupling)
+      for (const col of ['bus2', 'bus3'] as const) {
+        const b = stringValue(link[col]);
+        if (b && !busNames.has(b)) {
+          issues.push({ sheet: 'links', rowIndex: i, col, severity: 'error', message: `${col} "${b}" not found in buses` });
+        }
+      }
+      // Sanity-check efficiency (should be a ratio or COP, not %)
+      const eff = numberValue(link.efficiency);
+      if (link.efficiency !== undefined && link.efficiency !== null && link.efficiency !== '' && eff > 5) {
+        issues.push({ sheet: 'links', rowIndex: i, col: 'efficiency', severity: 'warning',
+          message: `efficiency ${eff} > 5 — check units (use ratio/COP, not %)` });
+      }
     });
 
     // ── Storage units ─────────────────────────────────────────────────────

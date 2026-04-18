@@ -46,9 +46,8 @@ def add_links(
         carrier = text(row.get("carrier"), "Link")
         if carrier not in network.carriers.index:
             network.add("Carrier", carrier, co2_emissions=0.0)
-        network.add(
-            "Link",
-            name,
+
+        kwargs: dict[str, Any] = dict(
             bus0=bus0,
             bus1=bus1,
             carrier=carrier,
@@ -57,7 +56,24 @@ def add_links(
             p_max_pu=number(row.get("p_max_pu"), 1.0),
             efficiency=number(row.get("efficiency"), 1.0),
             marginal_cost=number(row.get("marginal_cost"), 0.0),
+            capital_cost=number(row.get("capital_cost"), 0.0),
         )
+
+        # Multi-output ports (sector coupling: CHP, co-generation, etc.)
+        for suffix in ("2", "3"):
+            b = text(row.get(f"bus{suffix}"))
+            if b and b in network.buses.index:
+                kwargs[f"bus{suffix}"] = b
+                kwargs[f"efficiency{suffix}"] = number(row.get(f"efficiency{suffix}"), 1.0)
+
+        # Optional capacity optimisation
+        if bool(row.get("p_nom_extendable", False)):
+            kwargs["p_nom_extendable"] = True
+            p_nom_max = row.get("p_nom_max")
+            if p_nom_max not in (None, "", "inf"):
+                kwargs["p_nom_max"] = number(p_nom_max, float("inf"))
+
+        network.add("Link", name, **kwargs)
 
 
 def add_transformers(

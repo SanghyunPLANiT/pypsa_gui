@@ -67,6 +67,17 @@ export const CARRIER_COLORS: Record<string, string> = {
   Solar: '#f59e0b', Wind: '#0f766e', Hydro: '#2563eb', Storage: '#14b8a6',
   battery: '#0ea5e9', Imports: '#dc2626', LoadShedding: '#991b1b',
   load: '#94a3b8', HVDC: '#6366f1', Other: '#94a3b8',
+  // Sector coupling
+  heat: '#ef4444',
+  'power-to-heat': '#fb923c',
+  'heat-pump': '#f97316',
+  H2: '#06b6d4',
+  hydrogen: '#06b6d4',
+  electrolyzer: '#0ea5e9',
+  'fuel-cell': '#3b82f6',
+  EV: '#10b981',
+  'EV-charging': '#34d399',
+  V2G: '#6ee7b7',
 };
 
 // ── Constraint definitions ────────────────────────────────────────────────────

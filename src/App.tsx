@@ -20,7 +20,8 @@ import {
   AnalyticsSubTab,
 } from './types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS } from './constants';
-import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './shared/utils/workbook';
+import { SectorBundle } from './constants/sectorCouplingTemplates';
+import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows, createSectorCouplingExample } from './shared/utils/workbook';
 import { exportFullResults } from './shared/utils/exportResults';
 import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, snapshotMaxFromWorkbook } from './shared/utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './shared/utils/analytics';
@@ -206,6 +207,53 @@ function AppInner() {
       return { ...current, [sheet]: nextRows };
     });
     setStatus(`Added column "${col}" to ${sheet}.`);
+  };
+
+  const handleAddSectorBundle = (bundle: SectorBundle, powerBus: string, prefix: string) => {
+    setModel((current) => {
+      // Find the power bus to copy its x/y coordinates (offset slightly for new sector bus)
+      const refBus = current.buses.find(
+        (b) => String(b.name ?? '') === powerBus,
+      );
+      const bx = Number(refBus?.x ?? 0) + 0.05;
+      const by = Number(refBus?.y ?? 0) - 0.05;
+
+      // Substitute placeholders in a row
+      const sub = (row: Record<string, unknown>): Record<string, unknown> =>
+        Object.fromEntries(
+          Object.entries(row).map(([k, v]) => [
+            k,
+            typeof v === 'string'
+              ? v
+                  .replace(/\{prefix\}/g, prefix)
+                  .replace(/\{powerBus\}/g, powerBus)
+                  .replace(/\{x\}/g, String(bx))
+                  .replace(/\{y\}/g, String(by))
+              : v,
+          ]),
+        );
+
+      // De-duplicate helper
+      const merge = <T extends Record<string, unknown>>(
+        existing: T[],
+        incoming: Record<string, unknown>[],
+      ): T[] => {
+        const names = new Set(existing.map((r) => String(r.name ?? '')));
+        const fresh = incoming
+          .map(sub)
+          .filter((r) => !names.has(String(r.name ?? '')));
+        return [...existing, ...(fresh as T[])];
+      };
+
+      return {
+        ...current,
+        carriers: merge(current.carriers, bundle.carriers),
+        buses:    merge(current.buses,    bundle.buses),
+        loads:    merge(current.loads,    bundle.loads),
+        links:    merge(current.links,    bundle.links),
+      };
+    });
+    showToast(`Added ${bundle.label} sector coupling links`, 'success');
   };
 
   const handleRestoreRun = (entry: RunHistoryEntry) => {
@@ -500,6 +548,10 @@ function AppInner() {
                   .then((m) => resetForNewModel(m, 'sample_model.xlsx'))
                   .catch(() => setStatus('Could not reload sample model.'));
               }}
+              onSCDemo={() => {
+                resetForNewModel(createSectorCouplingExample(), 'sector_coupling_demo.xlsx');
+                showToast('Sector coupling demo loaded', 'success');
+              }}
               onExport={() => {
                 if (!results) return;
                 exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
@@ -542,6 +594,7 @@ function AppInner() {
                   onDeleteRow={deleteRow}
                   onAddColumn={addColumn}
                   onImportTsSheet={handleImportTsSheet}
+                  onAddSectorBundle={handleAddSectorBundle}
                   issues={modelIssues}
                   jumpTo={jumpTo}
                 />
