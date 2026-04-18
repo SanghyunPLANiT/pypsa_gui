@@ -251,7 +251,7 @@ export function UserDefinedChartCard({
             <select
               value={section.groupBy}
               onChange={(e) =>
-                onChange({ ...section, groupBy: e.target.value as GroupByOption, metricKey: EMPTY_METRIC_KEY, startIndex: 0, endIndex: 0 })
+                onChange({ ...section, groupBy: e.target.value as GroupByOption })
               }
             >
               <option value="carrier">Carrier</option>
@@ -314,7 +314,7 @@ export function UserDefinedChartCard({
           <AssetPills
             assetNames={assetNames}
             focusKeys={section.focusKeys}
-            onChange={(keys) => resetMetric({ focusKeys: keys })}
+            onChange={(keys) => onChange({ ...section, focusKeys: keys })}
           />
         </div>
       )}
