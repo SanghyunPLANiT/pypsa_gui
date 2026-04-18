@@ -3188,6 +3188,114 @@ th:hover .col-filter-btn { opacity: 1; }
   padding: 32px;
 }
 
+/* ── Map asset detail card ───────────────────────────────────────────────── */
+.map-detail-card {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  width: 256px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+  pointer-events: all;
+}
+.mdc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.mdc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.mdc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mdc-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.mdc-badge {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mdc-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.mdc-close:hover { background: #f1f5f9; color: var(--text); }
+.mdc-kpis {
+  padding: 6px 12px 4px;
+  border-bottom: 1px solid #f8fafc;
+}
+.mdc-kpi-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+}
+.mdc-kpi-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.mdc-kpi-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mdc-sparkline-wrap {
+  padding: 6px 12px 10px;
+}
+.mdc-sparkline-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.mdc-empty {
+  padding: 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+
 /* ── Year markers on snapshot slider ────────────────────────────────────── */
 .snap-year-track {
   position: relative;

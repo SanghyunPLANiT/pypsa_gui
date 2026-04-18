@@ -11,6 +11,7 @@ import { MapLegend, SmpLegend } from '../map/MapLegend';
 import { SummaryCards } from '../../shared/components/SummaryCards';
 import { UserDefinedChartCard } from '../../components/charts/UserDefinedChartCard';
 import { ResultsDashboard } from './ResultsDashboard';
+import { MapDetailCard } from './MapDetailCard';
 
 interface Props {
   results: RunResults;
@@ -104,6 +105,18 @@ export function AnalyticsPane({
   const smpMax = smpValues.length > 0 ? Math.max(...smpValues) : 1;
   const hasSmp = smpValues.some((v) => Math.abs(v) > 0.01);
 
+  // Generator p_nom scaling — sqrt so large/small coexist
+  const maxPnom = useMemo(() => {
+    const vals = model.generators.map((g) => numberValue(g.p_nom)).filter((v) => v > 0);
+    return vals.length > 0 ? Math.max(...vals) : 1;
+  }, [model.generators]);
+
+  const genRadius = (pNom: number, selected: boolean): number => {
+    const normalized = Math.sqrt(Math.max(pNom, 0) / maxPnom);
+    const base = Math.max(4, Math.round(4 + normalized * 13)); // 4–17
+    return selected ? base + 4 : base;
+  };
+
   // Unique generator carriers for legend
   const uniqueCarriers = Array.from(
     new Set(model.generators.map((g) => stringValue(g.carrier)).filter(Boolean)),
@@ -139,7 +152,7 @@ export function AnalyticsPane({
         <div className="chart-card-header">
           <div>
             <h3>Map section</h3>
-            <p>Click a generator, bus, line, link, or transformer to switch the chart section below.</p>
+            <p>Click any asset for KPIs and a preview chart. Generator bubble size scales with capacity.</p>
           </div>
           <div className="focus-chip">
             <span>Focus</span>
@@ -211,13 +224,15 @@ export function AnalyticsPane({
               if (!bus) return null;
               const name = stringValue(generator.name);
               const sel = analyticsFocus.type === 'generator' && analyticsFocus.key === name;
+              const pNom = numberValue(generator.p_nom);
+              const carrier = stringValue(generator.carrier);
               return (
                 <CircleMarker key={`${name}-analytics-${index}`}
                   center={[numberValue(bus.y) + 0.07, numberValue(bus.x) + 0.07]}
-                  radius={sel ? 9 : 5}
-                  pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 1.5, fillColor: carrierColor(stringValue(generator.carrier)), fillOpacity: 0.96 }}
+                  radius={genRadius(pNom, sel)}
+                  pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 1.5, fillColor: carrierColor(carrier), fillOpacity: 0.96 }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'generator', key: name }) }}>
-                  <Tooltip>{name} · Generator</Tooltip>
+                  <Tooltip>{name} · {carrier} · {pNom.toLocaleString(undefined, { maximumFractionDigits: 0 })} MW</Tooltip>
                 </CircleMarker>
               );
             })}
@@ -226,13 +241,14 @@ export function AnalyticsPane({
               if (!bus) return null;
               const name = stringValue(unit.name);
               const sel = analyticsFocus.type === 'storageUnit' && analyticsFocus.key === name;
+              const pNom = numberValue(unit.p_nom);
               return (
                 <CircleMarker key={`${name}-analytics-storage-${index}`}
                   center={[numberValue(bus.y) - 0.07, numberValue(bus.x) + 0.05]}
-                  radius={sel ? 9 : 5}
+                  radius={genRadius(pNom, sel)}
                   pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 1.5, fillColor: '#14b8a6', fillOpacity: 0.96 }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'storageUnit', key: name }) }}>
-                  <Tooltip>{name} · Storage Unit</Tooltip>
+                  <Tooltip>{name} · Storage Unit · {pNom.toLocaleString(undefined, { maximumFractionDigits: 0 })} MW</Tooltip>
                 </CircleMarker>
               );
             })}
@@ -253,6 +269,11 @@ export function AnalyticsPane({
           </MapContainer>
           <MapLegend carriers={uniqueCarriers} showLines={!hasLineLoading} />
           <SmpLegend show={hasSmp} min={smpMin} max={smpMax} />
+          <MapDetailCard
+            focus={analyticsFocus}
+            results={results}
+            onClose={() => setAnalyticsFocus({ type: 'system' })}
+          />
         </div>
       </section>
 
