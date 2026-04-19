@@ -244,3 +244,31 @@ Built-in presets (read-only, duplicatable):
 4. Every change must pass `npx tsc --noEmit` and `python3 -m py_compile`
    before review.
 5. One todo item in progress at a time.
+
+---
+
+### Renewable profile generator
+
+- [ ] Renewable profile generator (backend)
+  Location-based capacity factor time-series generator for solar PV and wind.
+  User picks a location (lat/lon from map click or bus coordinates) and a year.
+  Backend fetches hourly CF profiles from pluggable sources:
+    1. Renewables.ninja API  — solar + wind, requires free API token (stored in env)
+    2. ERA5 via atlite       — solar + wind, local reanalysis processing, no API key
+    3. PVGIS API             — solar PV, EU-focused, free, no key required
+  Generated profile written directly into generators-p_max_pu sheet for the selected
+  generator. Preview chart shown before writing.
+
+- [ ] Renewable profile generator UI
+  Triggered from: (1) Generate profile button on each generator table row,
+  (2) clicking a bus on the map.
+  Modal fields:
+    - Source selector (Renewables.ninja / ERA5 / PVGIS)
+    - Year picker
+    - Technology selector (solar-pv / wind-onshore / wind-offshore)
+    - Turbine or panel model selector where applicable
+    - Lat/lon fields — auto-filled from bus location
+    - Preview chart of the resulting 8760h CF profile
+    - Write to sheet button
+  API tokens entered once in the modal, stored in browser localStorage,
+  never sent to server logs.
