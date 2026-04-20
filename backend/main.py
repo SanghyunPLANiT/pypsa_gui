@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import multiprocessing as mp
 import queue
 import uuid
@@ -14,6 +15,25 @@ from .lib.config import load_system_defaults
 from .lib.models import RunPayload
 from .lib.network import validate_model
 from .lib.results import run_pypsa
+
+
+# ── Suppress per-poll access log noise ───────────────────────────────────────
+# GET /api/run/{id} fires every 1.5 s while a solve is in progress.
+# These lines add no diagnostic value at INFO level; they are re-emitted at
+# DEBUG so they remain capturable when needed (e.g. uvicorn --log-level debug).
+
+class _SuppressPollLogs(logging.Filter):
+    _debug = logging.getLogger("pypsa_gui.poll")
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        msg = record.getMessage()
+        if '"GET /api/run/' in msg and "HTTP" in msg:
+            self._debug.debug(msg)
+            return False
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_SuppressPollLogs())
 
 
 # ── Job store ─────────────────────────────────────────────────────────────────
