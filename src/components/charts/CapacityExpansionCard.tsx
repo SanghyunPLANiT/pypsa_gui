@@ -77,7 +77,7 @@ function ExpansionBarChart({ rows }: { rows: BarRow[] }) {
 
 // ── Summary table ─────────────────────────────────────────────────────────────
 
-function ExpansionTable({ assets }: { assets: ExpansionAsset[] }) {
+function ExpansionTable({ assets, currencySymbol = '$' }: { assets: ExpansionAsset[]; currencySymbol?: string }) {
   return (
     <div className="expansion-table-wrap">
       <table className="expansion-table">
@@ -90,7 +90,7 @@ function ExpansionTable({ assets }: { assets: ExpansionAsset[] }) {
             <th className="num">Installed</th>
             <th className="num">Optimised</th>
             <th className="num">New build</th>
-            <th className="num">Annual CAPEX ($)</th>
+            <th className="num">Annual CAPEX ({currencySymbol})</th>
           </tr>
         </thead>
         <tbody>
@@ -112,7 +112,7 @@ function ExpansionTable({ assets }: { assets: ExpansionAsset[] }) {
                 <td className={`num ${a.delta_mw > 0 ? 'delta-positive' : a.delta_mw < 0 ? 'delta-negative' : ''}`}>
                   {a.delta_mw > 0 ? '+' : ''}{a.delta_mw.toLocaleString()} {unit}
                 </td>
-                <td className="num">{a.capex_annual > 0 ? `$${Math.round(a.capex_annual).toLocaleString()}` : '—'}</td>
+                <td className="num">{a.capex_annual > 0 ? `${currencySymbol}${Math.round(a.capex_annual).toLocaleString()}` : '—'}</td>
               </tr>
             );
           })}
@@ -126,9 +126,10 @@ function ExpansionTable({ assets }: { assets: ExpansionAsset[] }) {
 
 interface Props {
   assets: ExpansionAsset[];
+  currencySymbol?: string;
 }
 
-export function CapacityExpansionCard({ assets }: Props) {
+export function CapacityExpansionCard({ assets, currencySymbol = '$' }: Props) {
   if (!assets.length) return null;
 
   const totalCapex = assets.reduce((s, a) => s + a.capex_annual, 0);
@@ -156,8 +157,8 @@ export function CapacityExpansionCard({ assets }: Props) {
         </div>
         <div className="expansion-kpi">
           <div className="expansion-kpi-label">Annual CAPEX</div>
-          <div className="expansion-kpi-value">${Math.round(totalCapex / 1e6).toLocaleString()}M</div>
-          <div className="expansion-kpi-unit">$/yr</div>
+          <div className="expansion-kpi-value">{currencySymbol}{Math.round(totalCapex / 1e6).toLocaleString()}M</div>
+          <div className="expansion-kpi-unit">{currencySymbol}/yr</div>
         </div>
       </div>
 
@@ -168,7 +169,7 @@ export function CapacityExpansionCard({ assets }: Props) {
         </div>
         <div className="expansion-table-col">
           <p className="expansion-section-label">Asset detail</p>
-          <ExpansionTable assets={assets} />
+          <ExpansionTable assets={assets} currencySymbol={currencySymbol} />
         </div>
       </div>
     </div>

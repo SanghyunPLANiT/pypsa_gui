@@ -47,9 +47,10 @@ interface Props {
   runHistory: RunHistoryEntry[];
   activeResults: RunResults | null;
   onToggleComparison: (id: string, inComparison: boolean) => void;
+  currencySymbol?: string;
 }
 
-export function ComparisonPane({ runHistory, activeResults, onToggleComparison }: Props) {
+export function ComparisonPane({ runHistory, activeResults, onToggleComparison, currencySymbol = '$' }: Props) {
   // Only show runs the user has opted into comparison
   const included = runHistory.filter((e) => e.inComparison);
 
@@ -116,6 +117,7 @@ export function ComparisonPane({ runHistory, activeResults, onToggleComparison }
         runHistory={included}
         activeResults={activeResults ?? included[0].results}
         onToggleComparison={onToggleComparison}
+        currencySymbol={currencySymbol}
       />
     </div>
   );

@@ -11,9 +11,10 @@ import { MeritOrderEntry } from '../../types';
 interface Props {
   entries: MeritOrderEntry[];
   systemLoad?: number; // peak system load in MW — draws a vertical demand line
+  currencySymbol?: string;
 }
 
-export function MeritOrderCard({ entries, systemLoad }: Props) {
+export function MeritOrderCard({ entries, systemLoad, currencySymbol = '$' }: Props) {
   const [hovered, setHovered] = useState<MeritOrderEntry | null>(null);
 
   if (!entries.length) {
@@ -131,7 +132,7 @@ export function MeritOrderCard({ entries, systemLoad }: Props) {
             transform="rotate(-90)"
             fontFamily="IBM Plex Sans, sans-serif"
           >
-            Marginal cost ($/MWh)
+            Marginal cost ({currencySymbol}/MWh)
           </text>
 
           {/* X-axis capacity ticks */}
@@ -172,7 +173,7 @@ export function MeritOrderCard({ entries, systemLoad }: Props) {
                 </text>
                 <text x={10} y={50} fontSize={10} fill="white"
                   fontFamily="IBM Plex Sans, sans-serif">
-                  Cost: <tspan fontWeight={700}>${hovered.marginal_cost.toLocaleString()}/MWh</tspan>
+                  Cost: <tspan fontWeight={700}>{currencySymbol}{hovered.marginal_cost.toLocaleString()}/MWh</tspan>
                 </text>
                 <text x={10} y={64} fontSize={10} fill="white"
                   fontFamily="IBM Plex Sans, sans-serif">
@@ -207,8 +208,8 @@ export function MeritOrderCard({ entries, systemLoad }: Props) {
         <span>Total installed: <strong>{Math.round(totalMW).toLocaleString()} MW</strong></span>
         <span>Generators: <strong>{entries.length}</strong></span>
         <span>Price range: <strong>
-          ${Math.min(...entries.map((e) => e.marginal_cost)).toLocaleString()} –
-          ${Math.max(...entries.map((e) => e.marginal_cost)).toLocaleString()} /MWh
+          {currencySymbol}{Math.min(...entries.map((e) => e.marginal_cost)).toLocaleString()} –
+          {currencySymbol}{Math.max(...entries.map((e) => e.marginal_cost)).toLocaleString()} /MWh
         </strong></span>
       </div>
     </div>

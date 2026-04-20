@@ -48,6 +48,9 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
 
     options: dict = payload.options or {}
 
+    # Currency symbol for formatted output strings
+    currency = str(options.get("currencySymbol", "$"))
+
     # Read solver performance options from run payload
     solver_options: dict = {}
     threads = options.get("solverThreads", 0)
@@ -202,8 +205,8 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
         {"label": "Installed capacity", "value": f"{round(total_capacity):,} MW", "detail": f"{round(renewable_share)}% renewable capacity share"},
         {"label": "Peak demand", "value": f"{round(total_load):,} MW", "detail": "from workbook load profile"},
         {"label": "Reserve position", "value": f"{round(total_capacity - reserve_requirement):,} MW", "detail": "installed capacity vs peak demand"},
-        {"label": "Peak price", "value": f"{round(float(price_series.max())):,} $/MWh", "detail": f"{peak_net_load:,} MW peak net load"},
-        {"label": "System emissions", "value": f"{round(total_emissions):,} ktCO2e", "detail": f"Carbon price {float(scenario.get('carbonPrice', 0.0)):.0f} $/t"},
+        {"label": "Peak price", "value": f"{round(float(price_series.max())):,} {currency}/MWh", "detail": f"{peak_net_load:,} MW peak net load"},
+        {"label": "System emissions", "value": f"{round(total_emissions):,} ktCO2e", "detail": f"Carbon price {float(scenario.get('carbonPrice', 0.0)):.0f} {currency}/t"},
         {"label": "Transmission stress", "value": f"{round(np.mean([x['value'] for x in line_loading]) if line_loading else 0):,}%", "detail": f"{sum(1 for x in line_loading if x['value'] > 80.0)} corridors above 80%"},
     ]
 
@@ -218,7 +221,7 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
 
     notes.extend([
         f"Backend PyPSA run solved {len(network.snapshots)} hourly snapshots with {len(network.generators)} generators and {len(network.loads)} loads.",
-        f"Average price settled at {average_price:.1f} $/MWh and peaked at {float(price_series.max()):.1f} $/MWh.",
+        f"Average price settled at {average_price:.1f} {currency}/MWh and peaked at {float(price_series.max()):.1f} {currency}/MWh.",
         f"Load shedding totalled {float(load_shed.sum()):.2f} MWh across the day.",
         f"Renewable energy share in dispatch reached {renewable_dispatch_share}%.",
     ])
@@ -247,8 +250,8 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
             "storeWeight": float(store_weights.iloc[0]) if len(store_weights) else snapshot_weight,
         },
         "assetDetails": {
-            "generators": build_generator_details(network, dispatch_frame, generator_weights, emissions_factors),
-            "buses": build_bus_details(network, dispatch_frame, generator_weights, emissions_factors),
+            "generators": build_generator_details(network, dispatch_frame, generator_weights, emissions_factors, currency),
+            "buses": build_bus_details(network, dispatch_frame, generator_weights, emissions_factors, currency),
             "storageUnits": build_storage_unit_details(network),
             "stores": build_store_details(network),
             "branches": build_branch_details(network),

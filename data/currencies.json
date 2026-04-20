@@ -1,0 +1,17 @@
+[
+  { "code": "USD", "symbol": "$",   "name": "US Dollar" },
+  { "code": "KRW", "symbol": "₩",   "name": "Korean Won" },
+  { "code": "EUR", "symbol": "€",   "name": "Euro" },
+  { "code": "GBP", "symbol": "£",   "name": "British Pound" },
+  { "code": "JPY", "symbol": "¥",   "name": "Japanese Yen" },
+  { "code": "AUD", "symbol": "A$",  "name": "Australian Dollar" },
+  { "code": "CAD", "symbol": "C$",  "name": "Canadian Dollar" },
+  { "code": "CNY", "symbol": "¥",   "name": "Chinese Yuan" },
+  { "code": "CHF", "symbol": "Fr",  "name": "Swiss Franc" },
+  { "code": "INR", "symbol": "₹",   "name": "Indian Rupee" },
+  { "code": "SGD", "symbol": "S$",  "name": "Singapore Dollar" },
+  { "code": "NOK", "symbol": "kr",  "name": "Norwegian Krone" },
+  { "code": "SEK", "symbol": "kr",  "name": "Swedish Krona" },
+  { "code": "DKK", "symbol": "kr",  "name": "Danish Krone" },
+  { "code": "NZD", "symbol": "NZ$", "name": "New Zealand Dollar" }
+]

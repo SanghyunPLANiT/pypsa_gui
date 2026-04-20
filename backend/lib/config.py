@@ -17,6 +17,13 @@ def load_system_defaults() -> dict:
 
 
 @lru_cache(maxsize=None)
+def load_currencies() -> list[dict]:
+    path = _DATA_DIR / "currencies.json"
+    with path.open() as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=None)
 def load_sample_model() -> dict:
     path = _DATA_DIR / "sample_model.json"
     with path.open() as f:

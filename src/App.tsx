@@ -343,7 +343,7 @@ function AppInner() {
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
-      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat, solverThreads: settings.solverThreads, solverType: settings.solverType },
+      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat, solverThreads: settings.solverThreads, solverType: settings.solverType, currencySymbol: settings.currencySymbol },
     };
 
     setRunDialogOpen(false);
@@ -632,6 +632,8 @@ function AppInner() {
               solverType={settings.solverType}
               onSolverThreadsChange={(v) => updateSettings({ solverThreads: v })}
               onSolverTypeChange={(v) => updateSettings({ solverType: v })}
+              currencyCode={settings.currencyCode}
+              onCurrencyChange={(code, symbol) => updateSettings({ currencyCode: code, currencySymbol: symbol })}
             />
           )}
         </aside>
@@ -723,7 +725,7 @@ function AppInner() {
               )}
 
               {analyticsSubTab === 'Comparison' && (
-                <ComparisonPane runHistory={runHistory} activeResults={results} onToggleComparison={handleToggleComparison} />
+                <ComparisonPane runHistory={runHistory} activeResults={results} onToggleComparison={handleToggleComparison} currencySymbol={settings.currencySymbol} />
               )}
 
               {(analyticsSubTab === 'Result' || analyticsSubTab === 'Analytics') && (
@@ -747,6 +749,7 @@ function AppInner() {
                     storageRows={storageRows}
                     runHistory={runHistory}
                     subTab={analyticsSubTab}
+                    currencySymbol={settings.currencySymbol}
                     onExportAll={() => {
                       exportFullResults(model, results, filename.replace(/\.xlsx$/i, ''));
                       showToast('Full results exported to Excel', 'success');

@@ -30,6 +30,7 @@ interface Props {
   storageRows: TimeSeriesRow[];
   runHistory: RunHistoryEntry[];
   subTab: AnalyticsSubTab;
+  currencySymbol: string;
   onExportAll?: () => void;
 }
 
@@ -54,6 +55,7 @@ export function AnalyticsPane({
   systemLoadRows, systemPriceRows, storageRows,
   runHistory,
   subTab,
+  currencySymbol,
   onExportAll,
 }: Props) {
   const focusTitle =
@@ -143,6 +145,7 @@ export function AnalyticsPane({
           systemLoadRows={systemLoadRows}
           systemPriceRows={systemPriceRows}
           storageRows={storageRows}
+          currencySymbol={currencySymbol}
           onExportAll={onExportAll}
         />
       )}
@@ -218,7 +221,7 @@ export function AnalyticsPane({
                   radius={sel ? 12 : 8}
                   pathOptions={{ color: sel ? '#f59e0b' : '#ffffff', weight: sel ? 3 : 2, fillColor: busFill, fillOpacity: 0.96 }}
                   eventHandlers={{ click: () => setAnalyticsFocus({ type: 'bus', key: busName }) }}>
-                  <Tooltip>{busName} · Bus{hasSmp && avgSmp !== undefined ? ` · Avg SMP ${avgSmp.toFixed(1)} $/MWh` : ''}</Tooltip>
+                  <Tooltip>{busName} · Bus{hasSmp && avgSmp !== undefined ? ` · Avg SMP ${avgSmp.toFixed(1)} ${currencySymbol}/MWh` : ''}</Tooltip>
                 </CircleMarker>
               );
             })}

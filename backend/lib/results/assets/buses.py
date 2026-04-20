@@ -16,6 +16,7 @@ def build_bus_details(
     dispatch_frame: pd.DataFrame,
     generator_weights: pd.Series,
     emissions_factors: dict[str, float] | None = None,
+    currency: str = "$",
 ) -> dict[str, Any]:
     if emissions_factors is None:
         emissions_factors = (
@@ -67,7 +68,7 @@ def build_bus_details(
             "summary": [
                 {"label": "Average load", "value": f"{round(float(load_series.mean())):,} MW", "detail": f"{len(load_names)} load(s) attached"},
                 {"label": "Average generation", "value": f"{round(float(gen_series.mean())):,} MW", "detail": f"{len(gen_names)} generator(s) attached"},
-                {"label": "Average SMP", "value": f"{round(float(price_at_bus.mean())):,} $/MWh", "detail": "Bus marginal price"},
+                {"label": "Average SMP", "value": f"{round(float(price_at_bus.mean())):,} {currency}/MWh", "detail": "Bus marginal price"},
             ],
             "netSeries": net_series,
             "hasVoltageMagnitude": v_mag is not None,

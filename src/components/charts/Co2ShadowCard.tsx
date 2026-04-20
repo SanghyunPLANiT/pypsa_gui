@@ -10,6 +10,7 @@ import { Co2Shadow } from '../../types';
 
 interface Props {
   shadow: Co2Shadow;
+  currencySymbol?: string;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -18,7 +19,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   none:    { bg: 'rgba(100,116,139,0.08)', text: '#64748b', label: 'No constraint' },
 };
 
-export function Co2ShadowCard({ shadow }: Props) {
+export function Co2ShadowCard({ shadow, currencySymbol = '$' }: Props) {
   const style = STATUS_STYLES[shadow.status] ?? STATUS_STYLES.none;
 
   return (
@@ -40,7 +41,7 @@ export function Co2ShadowCard({ shadow }: Props) {
             className="co2-kpi-value"
             style={{ color: shadow.status === 'binding' ? '#dc2626' : '#64748b' }}
           >
-            {shadow.found ? `$${shadow.shadow_price.toLocaleString()}` : '—'}
+            {shadow.found ? `${currencySymbol}${shadow.shadow_price.toLocaleString()}` : '—'}
           </div>
           <div className="co2-kpi-unit">/tCO₂</div>
         </div>
@@ -50,7 +51,7 @@ export function Co2ShadowCard({ shadow }: Props) {
         <div className="co2-kpi">
           <div className="co2-kpi-label">Explicit carbon price</div>
           <div className="co2-kpi-value" style={{ color: '#2563eb' }}>
-            {shadow.explicit_price > 0 ? `$${shadow.explicit_price.toLocaleString()}` : '—'}
+            {shadow.explicit_price > 0 ? `${currencySymbol}${shadow.explicit_price.toLocaleString()}` : '—'}
           </div>
           <div className="co2-kpi-unit">/tCO₂</div>
         </div>
@@ -79,7 +80,7 @@ export function Co2ShadowCard({ shadow }: Props) {
                 {shadow.shadow_price > shadow.explicit_price ? '+' : ''}
                 {(shadow.shadow_price - shadow.explicit_price).toFixed(0)}
               </div>
-              <div className="co2-kpi-unit">$/tCO₂ vs explicit</div>
+              <div className="co2-kpi-unit">{currencySymbol}/tCO₂ vs explicit</div>
             </div>
           </>
         )}
@@ -95,7 +96,7 @@ export function Co2ShadowCard({ shadow }: Props) {
           <ul>
             <li>
               The optimizer had to limit emissions to meet the CO₂ cap.
-              The shadow price of <strong>${shadow.shadow_price}/tCO₂</strong> is the
+              The shadow price of <strong>{currencySymbol}{shadow.shadow_price}/tCO₂</strong> is the
               marginal cost of tightening the cap by 1 tonne — i.e. the implied
               carbon price the system is effectively paying.
             </li>

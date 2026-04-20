@@ -4,12 +4,15 @@
  * Owns four SidebarGroup sections: File, Constraints, Results, History.
  * The parent (<App>) keeps the <aside> shell and the collapse toggle button.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CustomConstraint, RunHistoryEntry, RunResults, WorkbookModel } from '../shared/types';
 import { SidebarGroup } from '../shared/components/SidebarGroup';
 import { GlobalConstraintsSection } from '../features/constraints/GlobalConstraintsSection';
 import { RunHistoryList } from '../features/run-history/RunHistoryList';
 import { DateFormat, SolverType } from '../features/settings/useSettings';
+import { API_BASE } from '../constants';
+
+interface Currency { code: string; symbol: string; name: string; }
 
 const MAX_UNPINNED = 5;
 
@@ -37,6 +40,8 @@ export interface SidebarProps {
   solverType: SolverType;
   onSolverThreadsChange: (v: number) => void;
   onSolverTypeChange: (v: SolverType) => void;
+  currencyCode: string;
+  onCurrencyChange: (code: string, symbol: string) => void;
 }
 
 export function Sidebar({
@@ -61,7 +66,16 @@ export function Sidebar({
   solverType,
   onSolverThreadsChange,
   onSolverTypeChange,
+  currencyCode,
+  onCurrencyChange,
 }: SidebarProps) {
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/currencies`)
+      .then((r) => r.json())
+      .then((data: Currency[]) => setCurrencies(data))
+      .catch(() => {/* keep empty — currency select will be hidden */});
+  }, []);
   const carriers = Array.from(
     new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)),
   );
@@ -153,6 +167,32 @@ export function Sidebar({
             Applies to snapshot and time-series date columns.
           </p>
         </div>
+
+        {currencies.length > 0 && (
+          <div className="sg-setting-row">
+            <label className="sg-setting-label" htmlFor="currency-select">
+              Currency
+            </label>
+            <select
+              id="currency-select"
+              className="sg-setting-select"
+              value={currencyCode}
+              onChange={(e) => {
+                const c = currencies.find((x) => x.code === e.target.value);
+                if (c) onCurrencyChange(c.code, c.symbol);
+              }}
+            >
+              {currencies.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.symbol} — {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+            <p className="sg-setting-hint">
+              Used in all cost and price displays. Edit data/currencies.json to add more.
+            </p>
+          </div>
+        )}
 
         <div className="sg-setting-divider" />
 

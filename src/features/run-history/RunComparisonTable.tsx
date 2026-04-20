@@ -6,6 +6,7 @@ interface RunComparisonTableProps {
   runHistory: RunHistoryEntry[];
   activeResults: RunResults;
   onToggleComparison?: (id: string, inComparison: boolean) => void;
+  currencySymbol?: string;
 }
 
 /** Strip units/commas and return the first numeric token, or null. */
@@ -24,7 +25,7 @@ function delta(base: number, target: number): { text: string; dir: 'up' | 'down'
   return { text: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`, dir: pct > 0 ? 'up' : 'down' };
 }
 
-export function RunComparisonTable({ runHistory, activeResults, onToggleComparison }: RunComparisonTableProps) {
+export function RunComparisonTable({ runHistory, activeResults, onToggleComparison, currencySymbol = '$' }: RunComparisonTableProps) {
   if (runHistory.length < 2) return null;
 
   // Newest run first
@@ -36,7 +37,7 @@ export function RunComparisonTable({ runHistory, activeResults, onToggleComparis
   const summaryLabels = sorted[0].results.summary.map((s) => s.label);
 
   const settingRows: Array<{ label: string; fn: (e: RunHistoryEntry) => string }> = [
-    { label: 'Carbon price',  fn: (e) => e.carbonPrice > 0 ? `$${e.carbonPrice}/t` : '—' },
+    { label: 'Carbon price',  fn: (e) => e.carbonPrice > 0 ? `${currencySymbol}${e.carbonPrice}/t` : '—' },
     { label: 'Window',        fn: (e) => `${e.snapshotStart} → ${e.snapshotEnd}` },
     { label: 'Resolution',    fn: (e) => `${e.snapshotWeight} h` },
     { label: 'Generators',    fn: (e) => String(e.componentCounts.generators) },

@@ -90,6 +90,7 @@ interface Props {
   systemLoadRows: TimeSeriesRow[];
   systemPriceRows: TimeSeriesRow[];
   storageRows: TimeSeriesRow[];
+  currencySymbol?: string;
   onExportAll?: () => void;
 }
 
@@ -100,6 +101,7 @@ export function ResultsDashboard({
   systemLoadRows,
   systemPriceRows,
   storageRows,
+  currencySymbol = '$',
   onExportAll,
 }: Props) {
   const { showToast } = useToast();
@@ -206,7 +208,7 @@ export function ResultsDashboard({
       <div className="kpi-strip">
         <KpiCard label="Total dispatch" value={Math.round(totalDispatch).toLocaleString()} unit="MWh" />
         <KpiCard label="RE share" value={`${reShare.toFixed(1)}`} unit="%" green />
-        <KpiCard label="Avg price" value={`${avgPrice.toFixed(1)}`} unit="$/MWh" />
+        <KpiCard label="Avg price" value={`${avgPrice.toFixed(1)}`} unit={`${currencySymbol}/MWh`} />
         <KpiCard label="Emissions" value={emissionsDisplay} unit="" />
       </div>
 
@@ -243,9 +245,9 @@ export function ResultsDashboard({
         <DashboardSection title="System marginal price">
           <InteractiveTimeSeriesCard
             title="System marginal price"
-            description="$/MWh over all snapshots"
+            description={`${currencySymbol}/MWh over all snapshots`}
             data={systemPriceRows}
-            series={[{ key: 'price', label: 'SMP $/MWh', color: '#111827' }]}
+            series={[{ key: 'price', label: `SMP ${currencySymbol}/MWh`, color: '#111827' }]}
             mode="line"
             stacked={false}
           />
@@ -281,7 +283,7 @@ export function ResultsDashboard({
         </DashboardSection>
         <DashboardSection title="Price duration curve" onExport={exportPriceDuration}>
           <div ref={priceDurRef}>
-            <DurationCurveCard title="Marginal price ($/MWh)" data={sortedPrice} unit="$/MWh" color="#111827" />
+            <DurationCurveCard title={`Marginal price (${currencySymbol}/MWh)`} data={sortedPrice} unit={`${currencySymbol}/MWh`} color="#111827" />
           </div>
         </DashboardSection>
       </div>
@@ -305,7 +307,7 @@ export function ResultsDashboard({
       {/* Capacity expansion */}
       {results.expansionResults && results.expansionResults.length > 0 && (
         <DashboardSection title="Capacity expansion results" defaultOpen>
-          <CapacityExpansionCard assets={results.expansionResults} />
+          <CapacityExpansionCard assets={results.expansionResults} currencySymbol={currencySymbol} />
         </DashboardSection>
       )}
 
@@ -324,10 +326,11 @@ export function ResultsDashboard({
           <MeritOrderCard
             entries={results.meritOrder ?? []}
             systemLoad={peakLoad}
+            currencySymbol={currencySymbol}
           />
         </DashboardSection>
         <DashboardSection title="CO₂ constraint shadow price">
-          <Co2ShadowCard shadow={results.co2Shadow ?? {
+          <Co2ShadowCard currencySymbol={currencySymbol} shadow={results.co2Shadow ?? {
             found: false,
             constraint_name: null,
             shadow_price: 0,

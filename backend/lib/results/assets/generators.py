@@ -14,6 +14,7 @@ def build_generator_details(
     dispatch_frame: pd.DataFrame,
     generator_weights: pd.Series,
     emissions_factors: dict[str, float] | None = None,
+    currency: str = "$",
 ) -> dict[str, Any]:
     if emissions_factors is None:
         emissions_factors = (
@@ -49,7 +50,7 @@ def build_generator_details(
             "name": generator, "carrier": carrier, "bus": bus,
             "summary": [
                 {"label": "Energy", "value": f"{round(energy):,} MWh", "detail": f"{weight_val:g} h weighting applied"},
-                {"label": "Operating cost", "value": f"{round(energy * mc):,} $", "detail": f"{mc:.1f} $/MWh marginal cost"},
+                {"label": "Operating cost", "value": f"{round(energy * mc):,} {currency}", "detail": f"{mc:.1f} {currency}/MWh marginal cost"},
                 {"label": "Emissions", "value": f"{round(emissions):,} tCO2e", "detail": f"{emissions_factors.get(carrier, 0.0):.2f} t/MWh carrier factor"},
             ],
             "outputSeries": output_s,
