@@ -488,7 +488,17 @@ function AppInner() {
           {results && (
             <span className="topbar-run-meta">{results.runMeta.snapshotCount} snaps · {results.runMeta.snapshotWeight}h res</span>
           )}
-          <span className="topbar-status" title={status}>{status}</span>
+          {runStatus === 'running' ? (
+            <>
+              <span className="topbar-running">
+                <span className="topbar-spinner" />
+                Running… {Math.floor(runElapsed / 60) > 0 ? `${Math.floor(runElapsed / 60)}m ` : ''}{(runElapsed % 60).toString().padStart(2, '0')}s
+              </span>
+              <button className="tb-btn tb-btn--muted topbar-cancel" onClick={handleCancelRun}>Cancel</button>
+            </>
+          ) : (
+            <span className="topbar-status" title={status}>{status}</span>
+          )}
         </div>
         <nav className="tab-nav">
           {(['Model', 'Analytics'] as WorkspaceTab[]).map((item) => (
@@ -671,21 +681,6 @@ function AppInner() {
           )}
         </div>
       </div>
-
-      {/* ── Run progress overlay ── */}
-      {runStatus === 'running' && (
-        <div className="run-overlay">
-          <div className="run-overlay-card">
-            <div className="run-spinner" />
-            <div className="run-overlay-title">Solving model…</div>
-            <div className="run-overlay-elapsed">
-              {Math.floor(runElapsed / 60) > 0 ? `${Math.floor(runElapsed / 60)}m ` : ''}
-              {(runElapsed % 60).toString().padStart(2, '0')}s elapsed
-            </div>
-            <button className="secondary-button" onClick={handleCancelRun}>Cancel</button>
-          </div>
-        </div>
-      )}
 
       {/* ── Run dialog ── */}
       <RunDialog
