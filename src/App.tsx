@@ -70,8 +70,16 @@ function AppInner() {
   const [fileHandle, setFileHandle] = useState<BrowserFileHandle | null>(null);
   const [jumpTo, setJumpTo] = useState<{ sheet: string; rowIndex: number } | null>(null);
   const [runElapsed, setRunElapsed] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
+  const jobIdRef = useRef<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runStartRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current !== null) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
 
   const [settings, updateSettings] = useSettings();
   const modelIssues = useModelIssues(model);
@@ -87,12 +95,20 @@ function AppInner() {
     return () => clearInterval(id);
   }, [runStatus]);
 
-  const handleCancelRun = useCallback(() => {
-    abortRef.current?.abort();
+  const handleCancelRun = useCallback(async () => {
+    stopPolling();
+    const jobId = jobIdRef.current;
+    jobIdRef.current = null;
+    sessionStorage.removeItem('activeJobId');
+    if (jobId) {
+      try {
+        await fetch(`${API_BASE}/api/run/${jobId}`, { method: 'DELETE' });
+      } catch { /* ignore — process will be cleaned up server-side */ }
+    }
     setRunStatus('idle');
     setStatus('Run cancelled.');
     showToast('Run cancelled', 'info');
-  }, [showToast]);
+  }, [stopPolling, showToast]);
   const [filename, setFilename] = useState('ragnarok_case.xlsx');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -355,20 +371,36 @@ function AppInner() {
 
     setRunStatus('running');
     setStatus(`Running — ${snapshotCount} snapshots…`);
-    const abort = new AbortController();
-    abortRef.current = abort;
+
+    // ── Step 1: Start the job ────────────────────────────────────────────────
+    let jobId: string;
     try {
-      const response = await fetch(`${API_BASE}/api/run`, {
+      const startResp = await fetch(`${API_BASE}/api/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(runOptions),
-        signal: abort.signal,
       });
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Backend run failed with status ${response.status}.`);
+      if (!startResp.ok) {
+        const msg = await startResp.text();
+        throw new Error(msg || `Failed to start run (status ${startResp.status}).`);
       }
-      const nextResults = (await response.json()) as RunResults;
+      const { jobId: jid } = await startResp.json() as { jobId: string };
+      jobId = jid;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to start run.';
+      setRunStatus('error');
+      setStatus(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
+    jobIdRef.current = jobId;
+    sessionStorage.setItem('activeJobId', jobId);
+
+    // ── Step 2: Apply completed result ───────────────────────────────────────
+    const applyResult = (nextResults: RunResults) => {
+      sessionStorage.removeItem('activeJobId');
+      jobIdRef.current = null;
       setResults(nextResults);
       setRunStatus('done');
       setAnalyticsFocus({ type: 'system' });
@@ -406,13 +438,58 @@ function AppInner() {
         });
         return next;
       });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return; // cancelled — already handled
-      const msg = error instanceof Error ? error.message : 'Backend PyPSA run failed.';
-      setRunStatus('error');
-      setStatus(msg);
-      showToast(msg, 'error');
-    }
+    };
+
+    // ── Step 3: Poll until done ──────────────────────────────────────────────
+    // The job runs independently on the backend — a brief network disconnect
+    // just means polling retries, it does NOT kill the solve.
+    const poll = async (): Promise<void> => {
+      if (jobIdRef.current !== jobId) return; // cancelled or superseded
+
+      let data: { jobId: string; status: string; result?: RunResults };
+      try {
+        const resp = await fetch(`${API_BASE}/api/run/${jobId}`);
+
+        if (resp.status === 404) {
+          // Server restarted and lost the job
+          sessionStorage.removeItem('activeJobId');
+          jobIdRef.current = null;
+          setRunStatus('error');
+          setStatus('Run disconnected — server restarted. Please run again.');
+          showToast('Run disconnected — server restarted.', 'error');
+          return;
+        }
+
+        if (!resp.ok) {
+          const msg = await resp.text();
+          sessionStorage.removeItem('activeJobId');
+          jobIdRef.current = null;
+          setRunStatus('error');
+          setStatus(msg || 'Backend run failed.');
+          showToast(msg || 'Backend run failed.', 'error');
+          return;
+        }
+
+        data = await resp.json();
+      } catch {
+        // Network error — keep retrying silently
+        if (jobIdRef.current === jobId) {
+          pollTimerRef.current = setTimeout(poll, 2000);
+        }
+        return;
+      }
+
+      if (data.status === 'running') {
+        pollTimerRef.current = setTimeout(poll, 1500);
+        return;
+      }
+
+      // Done
+      applyResult(data.result!);
+    };
+
+    // First poll after a short delay to let the process spin up
+    pollTimerRef.current = setTimeout(poll, 1000);
   };
 
   // ── Metric series derived data ────────────────────────────────────────────

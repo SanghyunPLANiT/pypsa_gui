@@ -1,18 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import multiprocessing as mp
 import queue
+import uuid
+from dataclasses import dataclass
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .lib.config import load_system_defaults
 from .lib.models import RunPayload
 from .lib.network import validate_model
 from .lib.results import run_pypsa
+
+
+# ── Job store ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class _Job:
+    id: str
+    proc: mp.Process
+    result_queue: "mp.Queue[tuple[str, Any]]"
+    status: str = "running"   # running | done | error | cancelled
+    result: dict | None = None
+    error: str | None = None
+
+
+_jobs: dict[str, _Job] = {}
 
 
 # ── Subprocess worker ─────────────────────────────────────────────────────────
@@ -30,25 +46,27 @@ def _solve_worker(
         result_queue.put(("err", str(exc)))
 
 
-def _collect_result(
-    proc: mp.Process,
-    result_queue: "mp.Queue[tuple[str, Any]]",
-) -> dict[str, Any]:
-    """Block (in a thread) until the worker finishes or is killed."""
+async def _collect_job(job_id: str) -> None:
+    """Background asyncio task — waits for the worker process and updates job state."""
+    job = _jobs.get(job_id)
+    if job is None:
+        return
     while True:
         try:
-            status, data = result_queue.get(timeout=0.5)
-            proc.join(timeout=5)
-            if status == "err":
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"PyPSA optimization failed: {data}",
-                )
-            return data  # type: ignore[return-value]
+            status, data = job.result_queue.get_nowait()
+            if status == "ok":
+                job.status = "done"
+                job.result = data
+            else:
+                job.status = "error"
+                job.error = data
+            return
         except queue.Empty:
-            if not proc.is_alive():
-                # Process was terminated (cancelled) or crashed without putting a result
-                raise HTTPException(status_code=499, detail="Optimization was cancelled.")
+            if not job.proc.is_alive():
+                if job.status == "running":
+                    job.status = "cancelled"
+                return
+            await asyncio.sleep(0.5)
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
@@ -84,18 +102,19 @@ def validate_case(payload: RunPayload) -> dict[str, Any]:
 
 
 @app.post("/api/run")
-async def run_case(request: Request, payload: RunPayload) -> dict[str, Any]:
+async def start_run(payload: RunPayload) -> dict[str, Any]:
     """
-    Run PyPSA optimisation in a child process so it can be truly killed when
-    the user clicks Cancel (which aborts the HTTP request from the frontend).
+    Start a PyPSA optimisation job in a child process and return immediately.
+    The frontend polls GET /api/run/{job_id} for status and results.
+    Decoupling the job from the HTTP connection means brief disconnects no longer
+    kill the in-progress solve.
+    """
+    # Prune completed/cancelled jobs to avoid unbounded memory growth
+    stale = [jid for jid, j in list(_jobs.items()) if j.status in ("done", "error", "cancelled")]
+    for jid in stale:
+        _jobs.pop(jid, None)
 
-    Flow:
-      1. Spawn a child process running _solve_worker.
-      2. An async watcher task polls request.is_disconnected() every 0.5 s;
-         when the client disconnects it calls proc.terminate().
-      3. _collect_result() polls the queue in a thread; it returns the result
-         or raises once the process is no longer alive.
-    """
+    job_id = str(uuid.uuid4())
     ctx = mp.get_context("spawn")
     result_queue: mp.Queue = ctx.Queue()
     proc: mp.Process = ctx.Process(
@@ -104,25 +123,41 @@ async def run_case(request: Request, payload: RunPayload) -> dict[str, Any]:
         daemon=True,
     )
     proc.start()
+    _jobs[job_id] = _Job(id=job_id, proc=proc, result_queue=result_queue)
+    asyncio.create_task(_collect_job(job_id))
+    return {"jobId": job_id, "status": "running"}
 
-    async def _kill_on_disconnect() -> None:
-        while True:
-            if await request.is_disconnected():
-                if proc.is_alive():
-                    proc.terminate()
-                    proc.join(timeout=3)
-                break
-            await asyncio.sleep(0.5)
 
-    disconnect_task = asyncio.create_task(_kill_on_disconnect())
-    try:
-        return await asyncio.to_thread(_collect_result, proc, result_queue)
-    except Exception:
-        if proc.is_alive():
-            proc.terminate()
-            proc.join(timeout=3)
-        raise
-    finally:
-        disconnect_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await disconnect_task
+@app.get("/api/run/{job_id}")
+async def poll_run(job_id: str) -> dict[str, Any]:
+    """Poll the status of a running job. Returns result inline when done."""
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found or already cleaned up.")
+    if job.status == "running":
+        return {"jobId": job_id, "status": "running"}
+    elif job.status == "done":
+        result = job.result
+        _jobs.pop(job_id, None)   # free memory after delivery
+        return {"jobId": job_id, "status": "done", "result": result}
+    elif job.status == "error":
+        error = job.error
+        _jobs.pop(job_id, None)
+        raise HTTPException(status_code=500, detail=f"PyPSA optimization failed: {error}")
+    else:  # cancelled
+        _jobs.pop(job_id, None)
+        raise HTTPException(status_code=499, detail="Optimization was cancelled.")
+
+
+@app.delete("/api/run/{job_id}")
+async def cancel_run(job_id: str) -> dict[str, Any]:
+    """Terminate a running job's child process."""
+    job = _jobs.get(job_id)
+    if job is None:
+        return {"jobId": job_id, "status": "not_found"}
+    if job.proc.is_alive():
+        job.proc.terminate()
+        await asyncio.to_thread(job.proc.join, 3)
+    job.status = "cancelled"
+    _jobs.pop(job_id, None)
+    return {"jobId": job_id, "status": "cancelled"}
