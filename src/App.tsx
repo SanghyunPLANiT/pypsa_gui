@@ -211,6 +211,31 @@ function AppInner() {
     setStatus(`Added column "${col}" to ${sheet}.`);
   };
 
+  const deleteColumn = (sheet: SheetName, col: string) => {
+    setModel((current) => {
+      const nextRows = current[sheet].map((row) => {
+        const { [col]: _removed, ...rest } = row as Record<string, Primitive>;
+        return rest as GridRow;
+      });
+      return { ...current, [sheet]: nextRows };
+    });
+    setStatus(`Removed column "${col}" from ${sheet}.`);
+  };
+
+  const renameColumn = (sheet: SheetName, oldCol: string, newCol: string) => {
+    if (!newCol || newCol === oldCol) return;
+    setModel((current) => {
+      const nextRows = current[sheet].map((row) => {
+        const r = row as Record<string, Primitive>;
+        if (!(oldCol in r)) return row;
+        const { [oldCol]: val, ...rest } = r;
+        return { ...rest, [newCol]: val } as GridRow;
+      });
+      return { ...current, [sheet]: nextRows };
+    });
+    setStatus(`Renamed column "${oldCol}" to "${newCol}" in ${sheet}.`);
+  };
+
   const handleRestoreRun = (entry: RunHistoryEntry) => {
     setResults(entry.results);
     setTab('Analytics');
@@ -546,6 +571,8 @@ function AppInner() {
                   onAddRow={addRow}
                   onDeleteRow={deleteRow}
                   onAddColumn={addColumn}
+                  onDeleteColumn={deleteColumn}
+                  onRenameColumn={renameColumn}
                   onImportTsSheet={handleImportTsSheet}
                   issues={modelIssues}
                   jumpTo={jumpTo}

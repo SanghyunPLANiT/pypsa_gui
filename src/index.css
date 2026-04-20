@@ -2704,6 +2704,47 @@ th:hover .col-filter-btn { opacity: 1; }
   color: #2563eb !important;
   opacity: 1 !important;
 }
+
+/* Column delete button — shown on header hover */
+.col-delete-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.col-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+th:hover .col-delete-btn {
+  display: flex;
+}
+
+/* Column rename inline input */
+.col-rename-input {
+  width: 80px;
+  min-width: 40px;
+  max-width: 140px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border: 1px solid var(--brand);
+  border-radius: 3px;
+  outline: none;
+  background: #fff;
+  color: var(--text);
+}
+
 .col-filtered {
   background: #eff6ff !important;
 }

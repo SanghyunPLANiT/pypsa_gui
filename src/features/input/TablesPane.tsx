@@ -204,10 +204,16 @@ interface SpreadsheetGridProps {
   onUpdate?: (rowIndex: number, col: string, val: Primitive) => void;
   rowIssues?: Map<number, 'error' | 'warning'>;
   highlightRow?: number | null;
+  onDeleteColumn?: (col: string) => void;
+  onRenameColumn?: (oldCol: string, newCol: string) => void;
+  /** Columns that cannot be deleted or renamed (e.g. 'name') */
+  protectedCols?: string[];
 }
 
-function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, rowIssues, highlightRow }: SpreadsheetGridProps) {
+function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, rowIssues, highlightRow, onDeleteColumn, onRenameColumn, protectedCols }: SpreadsheetGridProps) {
   const [editCell, setEditCell] = useState<{ row: number; col: string; val: string } | null>(null);
+  const [renamingCol, setRenamingCol] = useState<string | null>(null);
+  const [renameVal, setRenameVal] = useState('');
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
 
   // Scroll highlighted row into view when jumpTo fires
@@ -321,7 +327,41 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, ro
                   ref={(el) => { thRefs.current[c] = el; }}
                 >
                   <div className="col-header-inner">
-                    <span className="col-header-label">{c}</span>
+                    {renamingCol === c ? (
+                      <input
+                        className="col-rename-input"
+                        autoFocus
+                        value={renameVal}
+                        onChange={(e) => setRenameVal(e.target.value)}
+                        onBlur={() => {
+                          const trimmed = renameVal.trim();
+                          if (trimmed && trimmed !== c && onRenameColumn) onRenameColumn(c, trimmed);
+                          setRenamingCol(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                          if (e.key === 'Escape') {
+                            setRenamingCol(null);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        className="col-header-label"
+                        title={`${c}  (double-click to rename)`}
+                        onDoubleClick={(e) => {
+                          if (!onRenameColumn || protectedCols?.includes(c)) return;
+                          e.stopPropagation();
+                          setRenamingCol(c);
+                          setRenameVal(c);
+                        }}
+                      >
+                        {c}
+                      </span>
+                    )}
                     <button
                       className={`col-filter-btn${active ? ' col-filter-btn--active' : ''}`}
                       title={active ? 'Filter active' : 'Filter'}
@@ -332,6 +372,20 @@ function SpreadsheetGrid({ rows, cols, frozenCol, readOnly = false, onUpdate, ro
                     >
                       v
                     </button>
+                    {onDeleteColumn && !protectedCols?.includes(c) && (
+                      <button
+                        className="col-delete-btn"
+                        title={`Remove column "${c}"`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Remove column "${c}" from all rows? This cannot be undone.`)) {
+                            onDeleteColumn(c);
+                          }
+                        }}
+                      >
+                        x
+                      </button>
+                    )}
                   </div>
                 </th>
               );
@@ -422,12 +476,14 @@ interface TablesPaneProps {
   onAddRow: (sheet: SheetName) => void;
   onDeleteRow: (sheet: SheetName, rowIndex: number) => void;
   onAddColumn: (sheet: SheetName, col: string, defaultValue: string | number | boolean) => void;
+  onDeleteColumn: (sheet: SheetName, col: string) => void;
+  onRenameColumn: (sheet: SheetName, oldCol: string, newCol: string) => void;
   onImportTsSheet: (sheet: TsSheetName, rows: GridRow[]) => void;
   issues?: ModelIssue[];
   jumpTo?: { sheet: string; rowIndex: number } | null;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onImportTsSheet, issues = [], jumpTo }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onDeleteColumn, onRenameColumn, onImportTsSheet, issues = [], jumpTo }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [jumpHighlight, setJumpHighlight] = useState<number | null>(null);
 
@@ -725,6 +781,9 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
               }
               rowIssues={isTs ? undefined : rowIssueMap}
               highlightRow={isTs ? null : jumpHighlight}
+              onDeleteColumn={isTs ? undefined : (col) => onDeleteColumn(sel.sheet as SheetName, col)}
+              onRenameColumn={isTs ? undefined : (old, next) => onRenameColumn(sel.sheet as SheetName, old, next)}
+              protectedCols={['name']}
             />
           )}
         </div>
