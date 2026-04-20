@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet';
 import { LatLngBoundsExpression } from 'leaflet';
 import { GridRow, WorkbookModel } from '../../shared/types';
@@ -6,13 +6,46 @@ import { numberValue, stringValue, carrierColor } from '../../shared/utils/helpe
 import { FitToBounds } from './FitToBounds';
 import { MapLegend } from './MapLegend';
 
+type LayerKey = 'buses' | 'generators' | 'lines' | 'links' | 'transformers';
+
 interface Props {
   model: WorkbookModel;
   bounds: LatLngBoundsExpression | null;
   busIndex: Record<string, GridRow>;
 }
 
+/** Return [lat, lng] from a row's own x/y if present, else null. */
+function ownCoords(row: GridRow): [number, number] | null {
+  const x = row.x;
+  const y = row.y;
+  if (x === undefined || x === null || x === '' || y === undefined || y === null || y === '') return null;
+  const lng = numberValue(x);
+  const lat = numberValue(y);
+  // Treat 0,0 as valid (prime meridian / equator is a real location)
+  return [lat, lng];
+}
+
+/** Return [lat, lng] for a component: own coords first, then bus coords + small offset. */
+function resolveCoords(
+  row: GridRow,
+  bus: GridRow | undefined,
+  offset = 0.07,
+): [number, number] | null {
+  const own = ownCoords(row);
+  if (own) return own;
+  if (!bus) return null;
+  const busCoords = ownCoords(bus);
+  if (!busCoords) return null;
+  return [busCoords[0] + offset, busCoords[1] + offset];
+}
+
 export function MapPane({ model, bounds, busIndex }: Props) {
+  const [visibleLayers, setVisibleLayers] = useState<Record<LayerKey, boolean>>({
+    buses: true, generators: true, lines: true, links: true, transformers: true,
+  });
+  const toggleLayer = (key: LayerKey) =>
+    setVisibleLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+
   const uniqueCarriers = Array.from(
     new Set(model.generators.map((g) => stringValue(g.carrier)).filter(Boolean)),
   );
@@ -75,41 +108,46 @@ export function MapPane({ model, bounds, busIndex }: Props) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           <FitToBounds bounds={bounds} />
-          {lineGeometries.map((line) => (
+          {visibleLayers.lines && lineGeometries.map((line) => (
             <Polyline key={line.name} positions={line.positions} pathOptions={{ color: '#2563eb', weight: 3, opacity: 0.72 }}>
               <Tooltip>{line.name} · {Math.round(line.sNom)} MVA</Tooltip>
             </Polyline>
           ))}
-          {linkGeometries.map((link) => (
+          {visibleLayers.links && linkGeometries.map((link) => (
             <Polyline key={link.name} positions={link.positions} pathOptions={{ color: '#0f766e', weight: 4, opacity: 0.84, dashArray: '10 8' }}>
               <Tooltip>{link.name} · {Math.round(link.pNom)} MW link</Tooltip>
             </Polyline>
           ))}
-          {transformerGeometries.map((transformer) => (
+          {visibleLayers.transformers && transformerGeometries.map((transformer) => (
             <Polyline key={transformer.name} positions={transformer.positions} pathOptions={{ color: '#f97316', weight: 4, opacity: 0.78, dashArray: '8 6' }}>
               <Tooltip>{transformer.name} · Transformer</Tooltip>
             </Polyline>
           ))}
-          {model.buses.map((bus, index) => (
-            <CircleMarker
-              key={`${stringValue(bus.name)}-${index}`}
-              center={[numberValue(bus.y), numberValue(bus.x)]}
-              radius={8}
-              pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 0.95 }}
-            >
-              <Tooltip sticky>
-                <strong>{stringValue(bus.name)}</strong><br />
-                {numberValue(bus.v_nom)} kV · {stringValue(bus.carrier)}
-              </Tooltip>
-            </CircleMarker>
-          ))}
-          {model.generators.map((generator, index) => {
+          {visibleLayers.buses && model.buses.map((bus, index) => {
+            const coords = ownCoords(bus);
+            if (!coords) return null;
+            return (
+              <CircleMarker
+                key={`${stringValue(bus.name)}-${index}`}
+                center={coords}
+                radius={8}
+                pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#2563eb', fillOpacity: 0.95 }}
+              >
+                <Tooltip sticky>
+                  <strong>{stringValue(bus.name)}</strong><br />
+                  {numberValue(bus.v_nom)} kV · {stringValue(bus.carrier)}
+                </Tooltip>
+              </CircleMarker>
+            );
+          })}
+          {visibleLayers.generators && model.generators.map((generator, index) => {
             const bus = busIndex[stringValue(generator.bus)];
-            if (!bus) return null;
+            const coords = resolveCoords(generator, bus, 0.07);
+            if (!coords) return null;
             return (
               <CircleMarker
                 key={`${stringValue(generator.name)}-${index}`}
-                center={[numberValue(bus.y) + 0.07, numberValue(bus.x) + 0.07]}
+                center={coords}
                 radius={5}
                 pathOptions={{ color: '#ffffff', weight: 1.5, fillColor: carrierColor(stringValue(generator.carrier)), fillOpacity: 0.95 }}
               >
@@ -119,6 +157,24 @@ export function MapPane({ model, bounds, busIndex }: Props) {
           })}
         </MapContainer>
         <MapLegend carriers={uniqueCarriers} showLines />
+        <div className="map-layer-controls">
+          {[
+            { key: 'buses',        label: 'Buses' },
+            { key: 'generators',   label: 'Generators' },
+            { key: 'lines',        label: 'Lines' },
+            { key: 'links',        label: 'Links' },
+            { key: 'transformers', label: 'Transformers' },
+          ].map(({ key, label }) => (
+            <label key={key} className="map-layer-toggle">
+              <input
+                type="checkbox"
+                checked={visibleLayers[key as LayerKey]}
+                onChange={() => toggleLayer(key as LayerKey)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
       </div>
     </div>
   );

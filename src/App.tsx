@@ -1,4 +1,5 @@
 import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSettings } from './features/settings/useSettings';
 import 'leaflet/dist/leaflet.css';
 
 import {
@@ -72,6 +73,7 @@ function AppInner() {
   const abortRef = useRef<AbortController | null>(null);
   const runStartRef = useRef<number>(0);
 
+  const [settings, updateSettings] = useSettings();
   const modelIssues = useModelIssues(model);
 
   // Elapsed-time ticker while running
@@ -300,7 +302,7 @@ function AppInner() {
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
-      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp },
+      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat },
     };
 
     setRunDialogOpen(false);
@@ -512,6 +514,8 @@ function AppInner() {
               onPinHistoryEntry={handlePinHistoryEntry}
               onDeleteHistoryEntry={handleDeleteHistoryEntry}
               onToggleComparison={handleToggleComparison}
+              dateFormat={settings.dateFormat}
+              onDateFormatChange={(f) => updateSettings({ dateFormat: f })}
             />
           )}
         </aside>
@@ -664,6 +668,7 @@ function AppInner() {
         forceLp={forceLp}
         dryRun={dryRun}
         snapshots={model.snapshots}
+        dateFormat={settings.dateFormat}
         onSnapshotStartChange={setSnapshotStart}
         onSnapshotEndChange={setSnapshotEnd}
         onSnapshotWeightChange={setSnapshotWeight}

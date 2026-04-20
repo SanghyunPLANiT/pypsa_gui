@@ -9,6 +9,7 @@ import { CustomConstraint, RunHistoryEntry, RunResults, WorkbookModel } from '..
 import { SidebarGroup } from '../shared/components/SidebarGroup';
 import { GlobalConstraintsSection } from '../features/constraints/GlobalConstraintsSection';
 import { RunHistoryList } from '../features/run-history/RunHistoryList';
+import { DateFormat } from '../features/settings/useSettings';
 
 const MAX_UNPINNED = 5;
 
@@ -30,6 +31,8 @@ export interface SidebarProps {
   onPinHistoryEntry: (id: string, pinned: boolean) => void;
   onDeleteHistoryEntry: (id: string) => void;
   onToggleComparison: (id: string, inComparison: boolean) => void;
+  dateFormat: DateFormat;
+  onDateFormatChange: (f: DateFormat) => void;
 }
 
 export function Sidebar({
@@ -48,6 +51,8 @@ export function Sidebar({
   onPinHistoryEntry,
   onDeleteHistoryEntry,
   onToggleComparison,
+  dateFormat,
+  onDateFormatChange,
 }: SidebarProps) {
   const carriers = Array.from(
     new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)),
@@ -119,6 +124,28 @@ export function Sidebar({
           </p>
         </SidebarGroup>
       )}
+
+      <SidebarGroup title="Settings">
+        <div className="sg-setting-row">
+          <label className="sg-setting-label" htmlFor="date-format-select">
+            Date format
+          </label>
+          <select
+            id="date-format-select"
+            className="sg-setting-select"
+            value={dateFormat}
+            onChange={(e) => onDateFormatChange(e.target.value as DateFormat)}
+          >
+            <option value="auto">Auto-detect</option>
+            <option value="ymd">YYYY-MM-DD (ISO)</option>
+            <option value="dmy">DD-MM-YYYY</option>
+            <option value="mdy">MM-DD-YYYY</option>
+          </select>
+          <p className="sg-setting-hint">
+            Applies to snapshot and time-series date columns.
+          </p>
+        </div>
+      </SidebarGroup>
     </>
   );
 }

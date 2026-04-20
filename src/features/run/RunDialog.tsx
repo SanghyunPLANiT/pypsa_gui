@@ -21,6 +21,7 @@ export interface RunDialogProps {
   forceLp: boolean;
   dryRun: boolean;
   snapshots: GridRow[];
+  dateFormat: string;
 
   onSnapshotStartChange: (v: number) => void;
   onSnapshotEndChange: (v: number) => void;
@@ -41,11 +42,27 @@ function getRawSnapshotStr(index: number, snapshots: GridRow[]): string {
   return raw.toLowerCase() === 'now' ? '' : raw;
 }
 
-function formatSnapLabel(index: number, snapshots: GridRow[], multiYear: boolean): string {
+function parseDateWithFormat(raw: string, dateFormat: string): Date {
+  // For dmy: rewrite "dd/mm/yyyy hh:mm" or "dd-mm-yyyy hh:mm" to ISO
+  if (dateFormat === 'dmy') {
+    // Match dd/mm/yyyy or dd-mm-yyyy optionally followed by time
+    const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(.*)$/);
+    if (m) return new Date(`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}${m[4]}`);
+  }
+  if (dateFormat === 'mdy') {
+    // Match mm/dd/yyyy or mm-dd-yyyy optionally followed by time
+    const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(.*)$/);
+    if (m) return new Date(`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}${m[4]}`);
+  }
+  // auto / ymd: let the browser parse (works for ISO and most unambiguous formats)
+  return new Date(raw);
+}
+
+function formatSnapLabel(index: number, snapshots: GridRow[], multiYear: boolean, dateFormat: string): string {
   const raw = getRawSnapshotStr(index, snapshots);
   if (!raw) return String(index);
   try {
-    const d = new Date(raw);
+    const d = parseDateWithFormat(raw, dateFormat);
     if (isNaN(d.getTime())) return raw;
     const mo = d.toLocaleString('en', { month: 'short' });
     const day = d.getDate();
@@ -69,6 +86,7 @@ export function RunDialog({
   forceLp,
   dryRun,
   snapshots,
+  dateFormat,
   onSnapshotStartChange,
   onSnapshotEndChange,
   onSnapshotWeightChange,
@@ -83,7 +101,7 @@ export function RunDialog({
 
     const firstRaw = getRawSnapshotStr(0, snapshots);
     if (!firstRaw) return { hasDatetimes: false, multiYear: false, yearMarkers: [] };
-    const firstDate = new Date(firstRaw);
+    const firstDate = parseDateWithFormat(firstRaw, dateFormat);
     if (isNaN(firstDate.getTime())) return { hasDatetimes: false, multiYear: false, yearMarkers: [] };
 
     // Compute year boundary markers across the full snapshot array
@@ -93,7 +111,7 @@ export function RunDialog({
     for (let i = 0; i < total; i++) {
       const raw = getRawSnapshotStr(i, snapshots);
       if (!raw) break;
-      const d = new Date(raw);
+      const d = parseDateWithFormat(raw, dateFormat);
       if (isNaN(d.getTime())) break;
       const yr = d.getFullYear();
       if (!seen.has(yr)) {
@@ -107,12 +125,12 @@ export function RunDialog({
       multiYear: markers.length > 1,
       yearMarkers: markers.length > 1 ? markers : [],
     };
-  }, [snapshots]);
+  }, [snapshots, dateFormat]);
 
   if (!open) return null;
 
-  const startLabel = hasDatetimes ? formatSnapLabel(snapshotStart, snapshots, multiYear) : null;
-  const endLabel   = hasDatetimes ? formatSnapLabel(snapshotEnd,   snapshots, multiYear) : null;
+  const startLabel = hasDatetimes ? formatSnapLabel(snapshotStart, snapshots, multiYear, dateFormat) : null;
+  const endLabel   = hasDatetimes ? formatSnapLabel(snapshotEnd,   snapshots, multiYear, dateFormat) : null;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -145,7 +163,7 @@ export function RunDialog({
                 max={maxSnapshots}
                 low={snapshotStart}
                 high={snapshotEnd}
-                formatLabel={(v) => formatSnapLabel(v, snapshots, multiYear)}
+                formatLabel={(v) => formatSnapLabel(v, snapshots, multiYear, dateFormat)}
                 onChange={(lo, hi) => { onSnapshotStartChange(lo); onSnapshotEndChange(hi); }}
               />
               {yearMarkers.length > 0 && (

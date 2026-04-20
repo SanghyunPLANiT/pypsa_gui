@@ -26,9 +26,12 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
 
     # Determine snapshot index: use workbook timestamps if available, else synthetic
     snapshot_rows = workbook_rows(model, "snapshots")
-    wb_index = workbook_snapshot_index(snapshot_rows)
 
     options = payload.options or {}
+    date_format: str = str(options.get("dateFormat", "auto"))
+
+    wb_index = workbook_snapshot_index(snapshot_rows, date_format=date_format)
+
     # step = temporal resolution: every `step`-th hourly snapshot is modelled;
     # each kept snapshot carries snapshot_weightings = step (hours it represents).
     # This matches the PyPSA convention: n.snapshots[::step] + weightings = step.

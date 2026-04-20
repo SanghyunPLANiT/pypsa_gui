@@ -9,9 +9,32 @@ from ..models import RunPayload
 from ..utils.coerce import number
 
 
-def workbook_snapshot_index(rows: list[dict[str, Any]]) -> pd.DatetimeIndex | None:
+def _detect_dayfirst(values: list[str]) -> bool:
+    """Heuristic: if any value has a first number > 12 it must be day-first."""
+    for v in values[:20]:
+        parts = v.replace("/", "-").split("-")
+        if len(parts) >= 2:
+            try:
+                first = int(parts[0])
+                if first > 12:
+                    return True
+                second = int(parts[1])
+                if second > 12:
+                    return False  # second part > 12 → month-first (mdy)
+            except ValueError:
+                continue
+    return False  # default to ISO / month-first when ambiguous
+
+
+def workbook_snapshot_index(
+    rows: list[dict[str, Any]],
+    date_format: str = "auto",
+) -> pd.DatetimeIndex | None:
     """Parse workbook snapshot rows as a real DatetimeIndex.
-    Returns None for static ('now') or empty models."""
+    Returns None for static ('now') or empty models.
+
+    date_format: 'auto' | 'ymd' | 'dmy' | 'mdy'
+    """
     if not rows:
         return None
     col = next((k for k in ("snapshot", "name", "datetime") if k in rows[0]), None)
@@ -20,8 +43,27 @@ def workbook_snapshot_index(rows: list[dict[str, Any]]) -> pd.DatetimeIndex | No
     first_val = str(rows[0].get(col) or "").strip().lower()
     if first_val in ("now", ""):
         return None
+
+    raw_values = [str(r[col]) for r in rows]
+
+    if date_format == "ymd":
+        # Strict ISO — no dayfirst inference needed
+        dayfirst = False
+    elif date_format == "dmy":
+        dayfirst = True
+    elif date_format == "mdy":
+        dayfirst = False
+    else:
+        # auto: try ISO parse first; fall back to heuristic
+        try:
+            return pd.DatetimeIndex([pd.Timestamp(v) for v in raw_values])
+        except Exception:
+            dayfirst = _detect_dayfirst(raw_values)
+
     try:
-        return pd.DatetimeIndex([pd.Timestamp(str(r[col])) for r in rows])
+        return pd.DatetimeIndex(
+            pd.to_datetime(raw_values, dayfirst=dayfirst, errors="raise")
+        )
     except Exception:
         return None
 

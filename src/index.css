@@ -531,6 +531,37 @@ button {
   display: block;
 }
 
+/* Settings panel inside sidebar */
+.sg-setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sg-setting-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.sg-setting-select {
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.sg-setting-select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.sg-setting-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
 /* Global constraints panel inside sidebar */
 .gcc {
   display: flex;
@@ -2457,6 +2488,30 @@ path.leaflet-interactive:focus {
 }
 .map-legend-line-svg { flex-shrink: 0; }
 .map-legend-label { color: var(--text); }
+
+/* Map layer visibility toggle bar */
+.map-layer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 7px 12px;
+  background: rgba(255,255,255,0.94);
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+.map-layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text);
+}
+.map-layer-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
 
 /* Loading gradient legend */
 .loading-legend { bottom: 24px; right: 12px; }

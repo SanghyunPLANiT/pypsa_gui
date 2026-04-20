@@ -112,10 +112,18 @@ export function loadingColor(pct: number): string {
   }
 }
 
+/** Return [lat, lng] from a row if x and y are both non-empty, else null. */
+export function rowCoords(row: GridRow): [number, number] | null {
+  const x = row.x; const y = row.y;
+  if (x === undefined || x === null || x === '' || y === undefined || y === null || y === '') return null;
+  return [numberValue(y), numberValue(x)];
+}
+
 export function getBounds(model: WorkbookModel): LatLngBoundsExpression | null {
-  const points = model.buses
-    .map((bus) => [numberValue(bus.y), numberValue(bus.x)] as [number, number])
-    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+  // Include buses with explicit coords AND generators with their own coords
+  const busPoints = model.buses.flatMap((bus) => { const c = rowCoords(bus); return c ? [c] : []; });
+  const genPoints = model.generators.flatMap((g) => { const c = rowCoords(g); return c ? [c] : []; });
+  const points = [...busPoints, ...genPoints];
   return points.length ? points : null;
 }
 
