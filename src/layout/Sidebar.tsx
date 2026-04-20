@@ -41,6 +41,7 @@ export interface SidebarProps {
   onSolverThreadsChange: (v: number) => void;
   onSolverTypeChange: (v: SolverType) => void;
   currencyCode: string;
+  currencySymbol: string;
   onCurrencyChange: (code: string, symbol: string) => void;
 }
 
@@ -67,6 +68,7 @@ export function Sidebar({
   onSolverThreadsChange,
   onSolverTypeChange,
   currencyCode,
+  currencySymbol,
   onCurrencyChange,
 }: SidebarProps) {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -140,6 +142,7 @@ export function Sidebar({
             onPinHistoryEntry={onPinHistoryEntry}
             onDeleteHistoryEntry={onDeleteHistoryEntry}
             onToggleComparison={onToggleComparison}
+            currencySymbol={currencySymbol}
           />
           <p className="hist-footnote">
             Last {MAX_UNPINNED} runs kept · pin to preserve

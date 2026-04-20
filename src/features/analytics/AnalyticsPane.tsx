@@ -279,6 +279,7 @@ export function AnalyticsPane({
             focus={analyticsFocus}
             results={results}
             onClose={() => setAnalyticsFocus({ type: 'system' })}
+            currencySymbol={currencySymbol}
           />
         </div>
       </section>
@@ -310,6 +311,7 @@ export function AnalyticsPane({
               section={section}
               results={results}
               model={model}
+              currencySymbol={currencySymbol}
               onChange={(next) => setChartSections((current) => current.map((item) => (item.id === section.id ? next : item)))}
               onClean={() => setChartSections((current) => current.map((item) =>
                 item.id === section.id

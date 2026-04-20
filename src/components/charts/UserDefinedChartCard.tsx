@@ -105,6 +105,7 @@ export function UserDefinedChartCard({
   onChange,
   onClean,
   onRemove,
+  currencySymbol = '$',
 }: {
   section: ChartSectionConfig;
   results: RunResults | null;
@@ -112,6 +113,7 @@ export function UserDefinedChartCard({
   onChange: (next: ChartSectionConfig) => void;
   onClean: () => void;
   onRemove: () => void;
+  currencySymbol?: string;
 }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
@@ -125,6 +127,7 @@ export function UserDefinedChartCard({
     section.focusType,
     section.focusKeys,
     section.groupBy,
+    currencySymbol,
   );
 
   const metric     = metricOptions.find((m) => m.key === section.metricKey);

@@ -633,6 +633,7 @@ function AppInner() {
               onSolverThreadsChange={(v) => updateSettings({ solverThreads: v })}
               onSolverTypeChange={(v) => updateSettings({ solverType: v })}
               currencyCode={settings.currencyCode}
+              currencySymbol={settings.currencySymbol}
               onCurrencyChange={(code, symbol) => updateSettings({ currencyCode: code, currencySymbol: symbol })}
             />
           )}
@@ -669,6 +670,7 @@ function AppInner() {
                   onImportTsSheet={handleImportTsSheet}
                   issues={modelIssues}
                   jumpTo={jumpTo}
+                  currencySymbol={settings.currencySymbol}
                 />
               )}
             </div>
@@ -775,6 +777,7 @@ function AppInner() {
         dryRun={dryRun}
         snapshots={model.snapshots}
         dateFormat={settings.dateFormat}
+        currencySymbol={settings.currencySymbol}
         onSnapshotStartChange={setSnapshotStart}
         onSnapshotEndChange={setSnapshotEnd}
         onSnapshotWeightChange={setSnapshotWeight}

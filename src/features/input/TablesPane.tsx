@@ -481,9 +481,10 @@ interface TablesPaneProps {
   onImportTsSheet: (sheet: TsSheetName, rows: GridRow[]) => void;
   issues?: ModelIssue[];
   jumpTo?: { sheet: string; rowIndex: number } | null;
+  currencySymbol?: string;
 }
 
-export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onDeleteColumn, onRenameColumn, onImportTsSheet, issues = [], jumpTo }: TablesPaneProps) {
+export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn, onDeleteColumn, onRenameColumn, onImportTsSheet, issues = [], jumpTo, currencySymbol = '$' }: TablesPaneProps) {
   const [sel, setSel] = useState<TableSel>({ kind: 'static', sheet: 'buses' });
   const [jumpHighlight, setJumpHighlight] = useState<number | null>(null);
 
@@ -762,6 +763,7 @@ export function TablesPane({ model, onUpdate, onAddRow, onDeleteRow, onAddColumn
             cols={cols}
             isTs={isTs}
             frozenCol={frozenCol}
+            currencySymbol={currencySymbol}
           />
         )}
 

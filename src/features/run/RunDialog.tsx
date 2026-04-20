@@ -22,6 +22,7 @@ export interface RunDialogProps {
   dryRun: boolean;
   snapshots: GridRow[];
   dateFormat: string;
+  currencySymbol?: string;
 
   onSnapshotStartChange: (v: number) => void;
   onSnapshotEndChange: (v: number) => void;
@@ -87,6 +88,7 @@ export function RunDialog({
   dryRun,
   snapshots,
   dateFormat,
+  currencySymbol = '$',
   onSnapshotStartChange,
   onSnapshotEndChange,
   onSnapshotWeightChange,
@@ -214,7 +216,7 @@ export function RunDialog({
         <div className="run-carbon-row">
           <label className="run-carbon-label" htmlFor="run-carbon-price">
             <span>Carbon price</span>
-            <span className="run-carbon-unit">$/tCO₂</span>
+            <span className="run-carbon-unit">{currencySymbol}/tCO₂</span>
           </label>
           <input
             id="run-carbon-price"

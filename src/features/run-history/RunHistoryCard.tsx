@@ -9,9 +9,10 @@ export interface RunHistoryCardProps {
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
   onToggleComparison: (inComparison: boolean) => void;
+  currencySymbol?: string;
 }
 
-export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete, onToggleComparison }: RunHistoryCardProps) {
+export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete, onToggleComparison, currencySymbol = '$' }: RunHistoryCardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.label);
   const [confirming, setConfirming] = useState(false);
@@ -76,7 +77,7 @@ export function RunHistoryCard({ entry, onView, onRename, onPin, onDelete, onTog
       <div className="hist-settings">
         <span>{entry.results.runMeta.snapshotCount} snaps</span>
         <span>{entry.snapshotWeight}h</span>
-        {entry.carbonPrice > 0 && <span>${entry.carbonPrice}/t CO₂</span>}
+        {entry.carbonPrice > 0 && <span>{currencySymbol}{entry.carbonPrice}/t CO₂</span>}
         {entry.activeConstraints.length > 0 && (
           <span title={entry.activeConstraints.map((c) => c.label).join(', ')}>
             {entry.activeConstraints.length} constraint{entry.activeConstraints.length > 1 ? 's' : ''}

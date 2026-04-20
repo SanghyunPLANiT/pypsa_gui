@@ -396,13 +396,14 @@ interface InputAnalyserProps {
   cols: string[];
   isTs: boolean;
   frozenCol: string | null;
+  currencySymbol?: string;
 }
 
 type StaticChart = 'bar' | 'grouped-bar' | 'donut' | 'scatter';
 type TsChart     = 'line' | 'stacked-area' | 'duration' | 'daily-profile';
 type AggMethod   = 'sum' | 'mean' | 'max' | 'min' | 'count';
 
-export function InputAnalyser({ rows, cols, isTs, frozenCol }: InputAnalyserProps) {
+export function InputAnalyser({ rows, cols, isTs, frozenCol, currencySymbol = '$' }: InputAnalyserProps) {
   const numericCols = useMemo(
     () => cols.filter((c) => c !== frozenCol && isNumericCol(rows, c)),
     [rows, cols, frozenCol],
@@ -531,7 +532,7 @@ export function InputAnalyser({ rows, cols, isTs, frozenCol }: InputAnalyserProp
 
   // Detect unit from column name
   const unit =
-    activeValue.includes('cost') ? '$/MWh'
+    activeValue.includes('cost') ? `${currencySymbol}/MWh`
     : activeValue === 'p_nom' || activeValue.includes('_mw') ? 'MW'
     : activeValue.includes('efficiency') || activeValue.includes('_pu') ? ''
     : '';

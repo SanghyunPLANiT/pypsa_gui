@@ -95,12 +95,13 @@ function buildMultiAssetOptions(
   assetDetails: RunResults['assetDetails'],
   assetKeys: string[],
   focusType: Exclude<AnalyticsFocus['type'], 'system'>,
+  currencySymbol: string = '$',
 ): MetricOption[] {
   const byMetric = new Map<string, MetricOption>();
 
   for (const assetKey of assetKeys) {
     const singleFocus = { type: focusType, key: assetKey } as AnalyticsFocus;
-    const opts = buildSingleAssetOptions(assetDetails, singleFocus);
+    const opts = buildSingleAssetOptions(assetDetails, singleFocus, currencySymbol);
 
     for (const opt of opts) {
       const merged = byMetric.get(opt.key) ?? {
@@ -142,6 +143,7 @@ function buildMultiAssetOptions(
 function buildSingleAssetOptions(
   assetDetails: RunResults['assetDetails'],
   focus: AnalyticsFocus,
+  currencySymbol: string = '$',
 ): MetricOption[] {
   if (focus.type === 'generator') {
     const g = assetDetails.generators[focus.key];
@@ -160,7 +162,7 @@ function buildSingleAssetOptions(
     return [
       { key: 'load',       label: 'Load',             unit: 'MW',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, load: p.load })),             series: [{ key: 'load',       label: 'Load MW',         color: '#f97316' }],  reducer: 'mean', allowDonut: false },
       { key: 'generation', label: 'Generation',        unit: 'MW',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, generation: p.generation })), series: [{ key: 'generation', label: 'Generation MW',    color: '#2563eb' }],  reducer: 'mean', allowDonut: false },
-      { key: 'smp',        label: 'SMP',               unit: '$/MWh',  rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, smp: p.smp })),               series: [{ key: 'smp',        label: 'SMP $/MWh',       color: '#111827' }],  reducer: 'mean', allowDonut: false },
+      { key: 'smp',        label: 'SMP',               unit: `${currencySymbol}/MWh`,  rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, smp: p.smp })),               series: [{ key: 'smp',        label: `SMP ${currencySymbol}/MWh`,       color: '#111827' }],  reducer: 'mean', allowDonut: false },
       { key: 'emissions',  label: 'Emissions',          unit: 'tCO2e', rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, emissions: p.emissions })),   series: [{ key: 'emissions',  label: 'Emissions tCO2e', color: '#16a34a' }],  reducer: 'sum',  allowDonut: false },
       ...(b.hasVoltageMagnitude ? [{ key: 'v_mag_pu', label: 'Voltage magnitude', unit: 'p.u.',     rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_mag_pu: p.v_mag_pu })), series: [{ key: 'v_mag_pu', label: 'Voltage p.u.',    color: '#7c3aed' }], reducer: 'mean' as const, allowDonut: false }] : []),
       ...(b.hasVoltageAngle    ? [{ key: 'v_ang',     label: 'Voltage angle',     unit: 'deg/rad',  rows: b.netSeries.map((p) => ({ label: p.label, timestamp: p.timestamp, v_ang: p.v_ang })),       series: [{ key: 'v_ang',     label: 'Voltage angle',  color: '#8b5cf6' }], reducer: 'mean' as const, allowDonut: false }] : []),
@@ -203,6 +205,7 @@ export function useMetricOptions(
   focusType: AnalyticsFocus['type'],
   focusKeys: string[],    // [] = all assets of that type; ['x'] = single
   groupBy: GroupByOption, // how multi-asset series are combined
+  currencySymbol: string = '$',
 ): MetricOption[] {
   // ── System-level derived rows (always computed, cheap) ──────────────────────
   const rawDispatch  = (results?.dispatchSeries          || []).map(normalizeSeriesPoint);
@@ -234,7 +237,7 @@ export function useMetricOptions(
         { key: 'dispatch',          label: 'Dispatch by carrier',       unit: 'MW',     rows: sysDispatchRows,  series: sysDispSeries,                                                                                                                                           reducer: 'mean', allowDonut: true  },
         { key: 'dispatch_by_gen',   label: 'Dispatch by generator',     unit: 'MW',     rows: sysGenDispRows,   series: sysGenDispSeries,                                                                                                                                        reducer: 'mean', allowDonut: true  },
         { key: 'load',              label: 'Total load',                 unit: 'MW',     rows: sysLoadRows,      series: [{ key: 'load',      label: 'Load MW',         color: '#f97316' }],                                                                                    reducer: 'mean', allowDonut: false },
-        { key: 'system_price',      label: 'System marginal price',      unit: '$/MWh',  rows: sysPriceRows,     series: [{ key: 'price',     label: 'Price $/MWh',     color: '#111827' }],                                                                                    reducer: 'mean', allowDonut: false },
+        { key: 'system_price',      label: 'System marginal price',      unit: `${currencySymbol}/MWh`,  rows: sysPriceRows,     series: [{ key: 'price',     label: `Price ${currencySymbol}/MWh`,     color: '#111827' }],                                                                                    reducer: 'mean', allowDonut: false },
         { key: 'system_emissions',  label: 'System emissions',           unit: 'tCO2e',  rows: sysEmissionsRows, series: [{ key: 'emissions', label: 'Emissions tCO2e', color: '#16a34a' }],                                                                                    reducer: 'sum',  allowDonut: false },
         { key: 'storage_power',     label: 'Storage power',              unit: 'MW',     rows: storageRows,      series: [{ key: 'charge',    label: 'Charge MW',       color: '#0ea5e9' }, { key: 'discharge', label: 'Discharge MW', color: '#f97316' }],                    reducer: 'mean', allowDonut: true  },
         { key: 'storage_state',     label: 'Storage state of charge',    unit: 'MWh',    rows: storageRows,      series: [{ key: 'state',     label: 'State of charge', color: '#14b8a6' }],                                                                                    reducer: 'mean', allowDonut: false },
@@ -245,7 +248,7 @@ export function useMetricOptions(
 
     // ── Single asset ──────────────────────────────────────────────────────────
     if (!isMulti) {
-      return buildSingleAssetOptions(results.assetDetails, { type: focusType, key: focusKeys[0] } as AnalyticsFocus);
+      return buildSingleAssetOptions(results.assetDetails, { type: focusType, key: focusKeys[0] } as AnalyticsFocus, currencySymbol);
     }
 
     // ── Multi / All ───────────────────────────────────────────────────────────
@@ -266,9 +269,9 @@ export function useMetricOptions(
       return buildMultiGenOptions(results.assetDetails, resolved, groupBy);
     }
     // Other types: merge by asset name
-    return buildMultiAssetOptions(results.assetDetails, resolved, focusType);
+    return buildMultiAssetOptions(results.assetDetails, resolved, focusType, currencySymbol);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, focusType, focusKeysSig, groupBy,
+  }, [results, focusType, focusKeysSig, groupBy, currencySymbol,
       sysDispatchRows, sysDispSeries, sysGenDispRows, sysGenDispSeries,
       sysLoadRows, sysPriceRows, sysEmissionsRows, storageRows]);
 }

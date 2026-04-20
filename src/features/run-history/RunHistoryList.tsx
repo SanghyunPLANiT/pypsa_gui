@@ -9,6 +9,7 @@ interface RunHistoryListProps {
   onPinHistoryEntry: (id: string, pinned: boolean) => void;
   onDeleteHistoryEntry: (id: string) => void;
   onToggleComparison: (id: string, inComparison: boolean) => void;
+  currencySymbol?: string;
 }
 
 export function RunHistoryList({
@@ -18,6 +19,7 @@ export function RunHistoryList({
   onPinHistoryEntry,
   onDeleteHistoryEntry,
   onToggleComparison,
+  currencySymbol = '$',
 }: RunHistoryListProps) {
   return (
     <div className="hist-list">
@@ -30,6 +32,7 @@ export function RunHistoryList({
           onPin={(pinned) => onPinHistoryEntry(entry.id, pinned)}
           onDelete={() => onDeleteHistoryEntry(entry.id)}
           onToggleComparison={(v) => onToggleComparison(entry.id, v)}
+          currencySymbol={currencySymbol}
         />
       ))}
     </div>

@@ -61,9 +61,10 @@ interface Props {
   focus: AnalyticsFocus;
   results: RunResults;
   onClose: () => void;
+  currencySymbol?: string;
 }
 
-export function MapDetailCard({ focus, results, onClose }: Props) {
+export function MapDetailCard({ focus, results, onClose, currencySymbol = '$' }: Props) {
   if (focus.type === 'system') return null;
 
   const key = focus.key;
@@ -90,7 +91,7 @@ export function MapDetailCard({ focus, results, onClose }: Props) {
     kpis = detail.summary.slice(0, 4).map((s) => ({ label: s.label, value: s.value }));
     sparkValues = detail.netSeries.map((p) => p.smp);
     sparkColor = '#7c3aed';
-    sparkLabel = 'Nodal SMP ($/MWh)';
+    sparkLabel = `Nodal SMP (${currencySymbol}/MWh)`;
   } else if (focus.type === 'storageUnit') {
     const detail = results.assetDetails.storageUnits[key];
     if (!detail) return null;
