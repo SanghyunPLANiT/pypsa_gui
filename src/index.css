@@ -561,6 +561,29 @@ button {
   margin: 0;
   line-height: 1.4;
 }
+.sg-setting-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0 8px;
+}
+.sg-setting-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.sg-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sg-solver-btn {
+  min-width: 38px;
+  font-size: 0.78rem;
+  padding: 3px 7px;
+}
 
 /* Global constraints panel inside sidebar */
 .gcc {

@@ -46,9 +46,29 @@ def run_pypsa(payload: RunPayload) -> dict[str, Any]:
     def extra_functionality(n, snapshots):
         apply_custom_constraints(n, custom_constraints, emissions_factors, notes)
 
+    options: dict = payload.options or {}
+
+    # Read solver performance options from run payload
+    solver_options: dict = {}
+    threads = options.get("solverThreads", 0)
+    if isinstance(threads, (int, float)) and int(threads) > 0:
+        solver_options["threads"] = int(threads)
+    solver_type = str(options.get("solverType", "simplex")).lower()
+    if solver_type in ("ipm", "simplex"):
+        solver_options["solver"] = solver_type
+
     try:
-        network.optimize(solver_name="highs", extra_functionality=extra_functionality)
-        notes.append("PyPSA optimize() solved with HiGHS.")
+        network.optimize(
+            solver_name="highs",
+            solver_options=solver_options if solver_options else {},
+            extra_functionality=extra_functionality,
+        )
+        solver_note = "HiGHS"
+        if solver_options.get("threads"):
+            solver_note += f" ({solver_options['threads']} threads)"
+        if solver_options.get("solver"):
+            solver_note += f", {solver_options['solver'].upper()}"
+        notes.append(f"PyPSA optimize() solved with {solver_note}.")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"PyPSA optimization failed: {exc}") from exc
 

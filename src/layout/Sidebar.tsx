@@ -9,7 +9,7 @@ import { CustomConstraint, RunHistoryEntry, RunResults, WorkbookModel } from '..
 import { SidebarGroup } from '../shared/components/SidebarGroup';
 import { GlobalConstraintsSection } from '../features/constraints/GlobalConstraintsSection';
 import { RunHistoryList } from '../features/run-history/RunHistoryList';
-import { DateFormat } from '../features/settings/useSettings';
+import { DateFormat, SolverType } from '../features/settings/useSettings';
 
 const MAX_UNPINNED = 5;
 
@@ -33,6 +33,10 @@ export interface SidebarProps {
   onToggleComparison: (id: string, inComparison: boolean) => void;
   dateFormat: DateFormat;
   onDateFormatChange: (f: DateFormat) => void;
+  solverThreads: number;
+  solverType: SolverType;
+  onSolverThreadsChange: (v: number) => void;
+  onSolverTypeChange: (v: SolverType) => void;
 }
 
 export function Sidebar({
@@ -53,6 +57,10 @@ export function Sidebar({
   onToggleComparison,
   dateFormat,
   onDateFormatChange,
+  solverThreads,
+  solverType,
+  onSolverThreadsChange,
+  onSolverTypeChange,
 }: SidebarProps) {
   const carriers = Array.from(
     new Set(model.carriers.map((c) => String(c.name ?? '')).filter(Boolean)),
@@ -143,6 +151,46 @@ export function Sidebar({
           </select>
           <p className="sg-setting-hint">
             Applies to snapshot and time-series date columns.
+          </p>
+        </div>
+
+        <div className="sg-setting-divider" />
+
+        <p className="sg-setting-section-title">Solver settings</p>
+
+        <div className="sg-setting-row">
+          <label className="sg-setting-label">Threads</label>
+          <div className="sg-btn-row">
+            {([0, 1, 2, 4, 8] as number[]).map((n) => (
+              <button
+                key={n}
+                className={`tb-btn sg-solver-btn${solverThreads === n ? '' : ' tb-btn--muted'}`}
+                onClick={() => onSolverThreadsChange(n)}
+              >
+                {n === 0 ? 'auto' : String(n)}
+              </button>
+            ))}
+          </div>
+          <p className="sg-setting-hint">
+            auto = HiGHS uses all available cores.
+          </p>
+        </div>
+
+        <div className="sg-setting-row">
+          <label className="sg-setting-label">Algorithm</label>
+          <div className="sg-btn-row">
+            {(['simplex', 'ipm'] as SolverType[]).map((t) => (
+              <button
+                key={t}
+                className={`tb-btn sg-solver-btn${solverType === t ? '' : ' tb-btn--muted'}`}
+                onClick={() => onSolverTypeChange(t)}
+              >
+                {t === 'simplex' ? 'Simplex' : 'IPM'}
+              </button>
+            ))}
+          </div>
+          <p className="sg-setting-hint">
+            IPM (interior point) is often faster for large LP models. Use Simplex for MIP / unit commitment runs.
           </p>
         </div>
       </SidebarGroup>

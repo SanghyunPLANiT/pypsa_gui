@@ -327,7 +327,7 @@ function AppInner() {
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
-      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat },
+      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat, solverThreads: settings.solverThreads, solverType: settings.solverType },
     };
 
     setRunDialogOpen(false);
@@ -541,6 +541,10 @@ function AppInner() {
               onToggleComparison={handleToggleComparison}
               dateFormat={settings.dateFormat}
               onDateFormatChange={(f) => updateSettings({ dateFormat: f })}
+              solverThreads={settings.solverThreads}
+              solverType={settings.solverType}
+              onSolverThreadsChange={(v) => updateSettings({ solverThreads: v })}
+              onSolverTypeChange={(v) => updateSettings({ solverType: v })}
             />
           )}
         </aside>

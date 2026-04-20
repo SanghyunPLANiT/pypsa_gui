@@ -1,9 +1,12 @@
 import { useState, useCallback } from 'react';
 
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
+export type SolverType = 'simplex' | 'ipm';
 
 export interface AppSettings {
   dateFormat: DateFormat;
+  solverThreads: number;   // 0 = let HiGHS decide (all cores)
+  solverType: SolverType;
 }
 
 const STORAGE_KEY = 'pypsa_gui_settings';
@@ -13,12 +16,16 @@ function loadSettings(): AppSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppSettings>;
-      return { dateFormat: parsed.dateFormat ?? 'auto' };
+      return {
+        dateFormat: parsed.dateFormat ?? 'auto',
+        solverThreads: parsed.solverThreads ?? 0,
+        solverType: parsed.solverType ?? 'simplex',
+      };
     }
   } catch {
     // ignore
   }
-  return { dateFormat: 'auto' };
+  return { dateFormat: 'auto', solverThreads: 0, solverType: 'simplex' };
 }
 
 function saveSettings(s: AppSettings): void {
