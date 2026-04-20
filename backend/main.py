@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import FastAPI
@@ -41,5 +42,8 @@ def validate_case(payload: RunPayload) -> dict[str, Any]:
 
 
 @app.post("/api/run")
-def run_case(payload: RunPayload) -> dict[str, Any]:
-    return run_pypsa(payload)
+async def run_case(payload: RunPayload) -> dict[str, Any]:
+    # run_pypsa calls network.optimize() which is CPU-bound and can take minutes.
+    # Running it in a thread pool keeps the ASGI event loop free so the frontend
+    # can still reach /api/health, /api/config, etc. while a solve is in progress.
+    return await asyncio.to_thread(run_pypsa, payload)
