@@ -126,6 +126,14 @@ export function resolvedColor(explicitColor: Primitive | undefined, carrier?: Pr
   return carrierColor(String(carrier ?? ''));
 }
 
+export function orderByCarrierRows(carrierRows: GridRow[], keys: string[]): string[] {
+  const ordered = carrierRows
+    .map((row) => stringValue(row.name).trim())
+    .filter((name) => name && keys.includes(name));
+  const remainder = keys.filter((key) => !ordered.includes(key));
+  return [...ordered, ...remainder];
+}
+
 /**
  * Map a line loading percentage (0–100+) to a colour on a
  * green → yellow → red traffic-light scale.

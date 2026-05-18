@@ -48,6 +48,7 @@ export interface SidebarProps {
   enableLoadShedding: boolean;
   onEnableLoadSheddingChange: (v: boolean) => void;
   onCarrierColorChange: (rowIndex: number, color: string) => void;
+  onCarrierMove: (rowIndex: number, direction: -1 | 1) => void;
 }
 
 export function Sidebar({
@@ -80,6 +81,7 @@ export function Sidebar({
   enableLoadShedding,
   onEnableLoadSheddingChange,
   onCarrierColorChange,
+  onCarrierMove,
 }: SidebarProps) {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   useEffect(() => {
@@ -245,6 +247,24 @@ export function Sidebar({
             {carrierRows.map(({ row, index, name }) => (
               <div key={`carrier-${name}-${index}`} className="sg-color-item">
                 <span className="sg-color-name" title={name}>{name}</span>
+                <div className="sg-color-actions">
+                  <button
+                    className="tb-btn tb-btn--muted sg-order-btn"
+                    disabled={index === 0}
+                    onClick={() => onCarrierMove(index, -1)}
+                    title="Move up"
+                  >
+                    ^
+                  </button>
+                  <button
+                    className="tb-btn tb-btn--muted sg-order-btn"
+                    disabled={index === carrierRows.length - 1}
+                    onClick={() => onCarrierMove(index, 1)}
+                    title="Move down"
+                  >
+                    v
+                  </button>
+                </div>
                 <input
                   type="color"
                   className="sg-color-input"

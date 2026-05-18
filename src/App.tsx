@@ -23,7 +23,7 @@ import {
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, MAX_UNPINNED_HISTORY } from './constants';
 import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './shared/utils/workbook';
 import { exportFullResults } from './shared/utils/exportResults';
-import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, setCarrierColorOverrides as setSharedCarrierColorOverrides, snapshotMaxFromWorkbook } from './shared/utils/helpers';
+import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, orderByCarrierRows, setCarrierColorOverrides as setSharedCarrierColorOverrides, snapshotMaxFromWorkbook } from './shared/utils/helpers';
 import { setCarrierColorOverrides as setLegacyCarrierColorOverrides } from './utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './shared/utils/analytics';
 import { RunDialog } from './features/run/RunDialog';
@@ -220,6 +220,17 @@ function AppInner() {
       return { ...current, [sheet]: nextRows };
     });
     setStatus(`Removed row ${rowIndex + 1} from ${sheet}.`);
+  };
+
+  const moveRow = (sheet: SheetName, rowIndex: number, direction: -1 | 1) => {
+    setModel((current) => {
+      const nextIndex = rowIndex + direction;
+      if (nextIndex < 0 || nextIndex >= current[sheet].length) return current;
+      const nextRows = [...current[sheet]];
+      const [row] = nextRows.splice(rowIndex, 1);
+      nextRows.splice(nextIndex, 0, row);
+      return { ...current, [sheet]: nextRows };
+    });
   };
 
   const addColumn = (sheet: SheetName, col: string, defaultValue: string | number | boolean) => {
@@ -513,7 +524,7 @@ function AppInner() {
   );
   const dispatchKeys =
     inferredDispatchKeys.length > 0
-      ? inferredDispatchKeys
+      ? orderByCarrierRows(model.carriers, inferredDispatchKeys)
       : (results?.carrierMix || []).map((item) => item.label).filter(Boolean);
   const systemDispatchSeries: TimeSeriesSeries[] = dispatchKeys.map((key) => ({ key, label: key, color: carrierColor(key) }));
 
@@ -654,6 +665,7 @@ function AppInner() {
               enableLoadShedding={settings.enableLoadShedding}
               onEnableLoadSheddingChange={(v) => updateSettings({ enableLoadShedding: v })}
               onCarrierColorChange={(rowIndex, color) => updateRowValue('carriers', rowIndex, 'color', color)}
+              onCarrierMove={(rowIndex, direction) => moveRow('carriers', rowIndex, direction)}
             />
           )}
         </aside>

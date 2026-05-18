@@ -654,6 +654,17 @@ button {
   justify-content: space-between;
   gap: 8px;
 }
+.sg-color-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.sg-order-btn {
+  min-width: 24px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+}
 .sg-color-meta {
   min-width: 0;
   display: flex;

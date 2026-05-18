@@ -8,7 +8,7 @@ import {
   TimeSeriesSeries,
   WorkbookModel,
 } from '../../shared/types';
-import { carrierColor, hashColor, numberValue } from '../../shared/utils/helpers';
+import { carrierColor, hashColor, numberValue, orderByCarrierRows } from '../../shared/utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from '../../shared/utils/analytics';
 
 // ── Multi-generator aggregation ───────────────────────────────────────────────
@@ -36,6 +36,7 @@ function buildMultiGenMetric(
   genNames: string[],
   field: GenField,
   groupBy: GroupByOption,
+  model: WorkbookModel,
 ): { rows: TimeSeriesRow[]; series: TimeSeriesSeries[] } {
   const byLabel = new Map<string, { timestamp?: string; vals: Record<string, number> }>();
 
@@ -52,9 +53,10 @@ function buildMultiGenMetric(
     }
   }
 
-  const seriesKeys = Array.from(
+  const rawSeriesKeys = Array.from(
     new Set(Array.from(byLabel.values()).flatMap((e) => Object.keys(e.vals))),
   );
+  const seriesKeys = groupBy === 'carrier' ? orderByCarrierRows(model.carriers, rawSeriesKeys) : rawSeriesKeys;
 
   const rows: TimeSeriesRow[] = Array.from(byLabel.entries()).map(([label, e]) => ({
     label,
@@ -76,6 +78,7 @@ function buildMultiGenOptions(
   assetDetails: RunResults['assetDetails'],
   genNames: string[],
   groupBy: GroupByOption,
+  model: WorkbookModel,
 ): MetricOption[] {
   const GEN_FIELDS: Array<{ field: GenField; label: string; unit: string; reducer: MetricOption['reducer'] }> = [
     { field: 'output',      label: 'Output',          unit: 'MW',     reducer: 'mean' },
@@ -85,7 +88,7 @@ function buildMultiGenOptions(
   ];
 
   return GEN_FIELDS.map(({ field, label, unit, reducer }) => {
-    const { rows, series } = buildMultiGenMetric(assetDetails, genNames, field, groupBy);
+    const { rows, series } = buildMultiGenMetric(assetDetails, genNames, field, groupBy, model);
     return { key: field, label, unit, rows, series, reducer, allowDonut: groupBy === 'carrier' };
   });
 }
@@ -216,7 +219,8 @@ export function useMetricOptions(
 
   const sysDispatchRows  = hasValues(rawDispatch)  ? rawDispatch  : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'carrier');
   const sysGenDispRows   = hasValues(rawGenDisp)   ? rawGenDisp   : buildRowsFromGeneratorDetails(results?.assetDetails.generators || {}, 'generator');
-  const sysDispKeys      = Array.from(new Set(sysDispatchRows.flatMap((r) => Object.keys(r).filter((k) => !SKIP.has(k)))));
+  const rawSysDispKeys   = Array.from(new Set(sysDispatchRows.flatMap((r) => Object.keys(r).filter((k) => !SKIP.has(k)))));
+  const sysDispKeys      = orderByCarrierRows(_model.carriers, rawSysDispKeys);
   const sysGenDispKeys   = Array.from(new Set(sysGenDispRows.flatMap((r) => Object.keys(r).filter((k) => !SKIP.has(k)))));
   const sysDispSeries    = sysDispKeys.map((k)    => ({ key: k, label: k, color: carrierColor(k) }));
   const sysGenDispSeries = sysGenDispKeys.map((k) => ({ key: k, label: k, color: results?.assetDetails.generators[k]?.color || hashColor(k) }));
@@ -266,7 +270,7 @@ export function useMetricOptions(
     const resolved = focusKeys.length === 0 ? allKeys : focusKeys;
 
     if (focusType === 'generator') {
-      return buildMultiGenOptions(results.assetDetails, resolved, groupBy);
+      return buildMultiGenOptions(results.assetDetails, resolved, groupBy, _model);
     }
     // Other types: merge by asset name
     return buildMultiAssetOptions(results.assetDetails, resolved, focusType, currencySymbol);
