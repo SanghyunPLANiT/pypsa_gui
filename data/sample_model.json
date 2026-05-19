@@ -15,7 +15,6 @@
     { "name": "Hydro",       "co2_emissions": 0.01, "color": "#2563eb" },
     { "name": "Storage",     "co2_emissions": 0.01, "color": "#14b8a6" },
     { "name": "battery",     "co2_emissions": 0.01, "color": "#0ea5e9" },
-    { "name": "Imports",     "co2_emissions": 0.55, "color": "#dc2626" },
     { "name": "LoadShedding","co2_emissions": 0.0,  "color": "#991b1b" },
     { "name": "load",        "co2_emissions": 0.0,  "color": "#94a3b8" },
     { "name": "HVDC",        "co2_emissions": 0.0,  "color": "#6366f1" }

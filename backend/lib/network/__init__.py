@@ -12,7 +12,7 @@ from ..utils.coerce import number, text
 from ..utils.workbook import workbook_rows
 from .buses import add_buses, add_loads
 from .constraints import add_global_constraints
-from .generators import add_generators, add_grid_imports_and_shedding
+from .generators import add_generators, add_load_shedding
 from .lines import add_links, add_lines, add_shunt_impedances, add_transformers
 from .processes import add_processes
 from .storage import add_storage_units, add_stores
@@ -76,7 +76,7 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
     )
 
     # Carriers
-    system_carriers = {"Imports", "LoadShedding"}
+    system_carriers = {"LoadShedding"}
     for row in workbook_rows(model, "carriers"):
         carrier_name = text(row.get("name"))
         if carrier_name and carrier_name not in network.carriers.index:
@@ -121,7 +121,15 @@ def build_network(payload: RunPayload) -> tuple[pypsa.Network, list[str]]:
         force_lp=force_lp, currency=currency,
     )
     enable_load_shedding = bool(options.get("enableLoadShedding", False))
-    add_grid_imports_and_shedding(network, load_totals, carbon_price, notes, enable_load_shedding)
+    load_shedding_cost = options.get("loadSheddingCost")
+    add_load_shedding(
+        network,
+        load_totals,
+        notes,
+        enable_load_shedding=enable_load_shedding,
+        load_shedding_cost=load_shedding_cost,
+        currency=currency,
+    )
 
     # Transmission
     add_lines(network, model)

@@ -361,7 +361,7 @@ function AppInner() {
     const runOptions = {
       model,
       scenario: { constraints: constraints.filter((c) => c.enabled), carbonPrice },
-      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat, solverThreads: settings.solverThreads, solverType: settings.solverType, currencySymbol: settings.currencySymbol, enableLoadShedding: settings.enableLoadShedding },
+      options: { snapshotCount, snapshotStart, snapshotWeight, forceLp, dateFormat: settings.dateFormat, solverThreads: settings.solverThreads, solverType: settings.solverType, currencySymbol: settings.currencySymbol, enableLoadShedding: settings.enableLoadShedding, loadSheddingCost: settings.loadSheddingCost },
     };
 
     setRunDialogOpen(false);
@@ -664,6 +664,8 @@ function AppInner() {
               onCarbonPriceChange={setCarbonPrice}
               enableLoadShedding={settings.enableLoadShedding}
               onEnableLoadSheddingChange={(v) => updateSettings({ enableLoadShedding: v })}
+              loadSheddingCost={settings.loadSheddingCost}
+              onLoadSheddingCostChange={(v) => updateSettings({ loadSheddingCost: v })}
               onCarrierColorChange={(rowIndex, color) => updateRowValue('carriers', rowIndex, 'color', color)}
               onCarrierMove={(rowIndex, direction) => moveRow('carriers', rowIndex, direction)}
             />

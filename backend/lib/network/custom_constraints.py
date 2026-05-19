@@ -27,7 +27,7 @@ def apply_custom_constraints(
     # Pre-build generator index sets used repeatedly
     supply_gens = [
         g for g in n.generators.index
-        if not g.startswith("load_shedding_") and g != "grid_imports"
+        if not g.startswith("load_shedding_")
     ]
     shed_gens = [g for g in n.generators.index if g.startswith("load_shedding_")]
     re_carriers = {"Solar", "Wind", "Hydro"}

@@ -10,6 +10,7 @@ export interface AppSettings {
   currencyCode: string;      // ISO 4217 code, e.g. "USD"
   currencySymbol: string;    // display symbol, e.g. "$"
   enableLoadShedding: boolean;
+  loadSheddingCost: number;   // VOLL in the currently-selected currency, per MWh
 }
 
 const STORAGE_KEY = 'pypsa_gui_settings';
@@ -26,12 +27,13 @@ function loadSettings(): AppSettings {
         currencyCode: parsed.currencyCode ?? 'USD',
         currencySymbol: parsed.currencySymbol ?? '$',
         enableLoadShedding: parsed.enableLoadShedding ?? false,
+        loadSheddingCost: parsed.loadSheddingCost ?? 2000,
       };
     }
   } catch {
     // ignore
   }
-  return { dateFormat: 'auto', solverThreads: 0, solverType: 'simplex', currencyCode: 'USD', currencySymbol: '$', enableLoadShedding: false };
+  return { dateFormat: 'auto', solverThreads: 0, solverType: 'simplex', currencyCode: 'USD', currencySymbol: '$', enableLoadShedding: false, loadSheddingCost: 2000 };
 }
 
 function saveSettings(s: AppSettings): void {

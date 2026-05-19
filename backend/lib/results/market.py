@@ -16,8 +16,8 @@ from ..constants import generator_color
 def build_merit_order(network: pypsa.Network) -> list[dict[str, Any]]:
     """Return the supply-stack (merit order) sorted by marginal cost.
 
-    System generators (grid_imports, load_shedding_*) are excluded — they
-    exist as reliability backstops and distort the supply curve.
+    System generators (load_shedding_*) are excluded — they exist as
+    reliability backstops and would distort the supply curve.
 
     Each dict:
         name          – generator name
@@ -28,7 +28,7 @@ def build_merit_order(network: pypsa.Network) -> list[dict[str, Any]]:
         cumulative_mw – left edge of this generator's block on the x-axis
         color         – hex colour for the carrier
     """
-    SYSTEM_GEN_PREFIXES = ("grid_imports", "load_shedding_", "system_bess")
+    SYSTEM_GEN_PREFIXES = ("load_shedding_", "system_bess")
 
     rows: list[dict[str, Any]] = []
     for name in network.generators.index:

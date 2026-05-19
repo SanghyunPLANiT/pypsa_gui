@@ -47,6 +47,8 @@ export interface SidebarProps {
   onCarbonPriceChange: (v: number) => void;
   enableLoadShedding: boolean;
   onEnableLoadSheddingChange: (v: boolean) => void;
+  loadSheddingCost: number;
+  onLoadSheddingCostChange: (v: number) => void;
   onCarrierColorChange: (rowIndex: number, color: string) => void;
   onCarrierMove: (rowIndex: number, direction: -1 | 1) => void;
 }
@@ -80,6 +82,8 @@ export function Sidebar({
   onCarbonPriceChange,
   enableLoadShedding,
   onEnableLoadSheddingChange,
+  loadSheddingCost,
+  onLoadSheddingCostChange,
   onCarrierColorChange,
   onCarrierMove,
 }: SidebarProps) {
@@ -297,6 +301,29 @@ export function Sidebar({
           <p className="sg-setting-hint">
             When off, supply shortfalls surface as solver infeasibility instead of being silently absorbed.
           </p>
+          {enableLoadShedding && (
+            <>
+              <label className="sg-setting-label" htmlFor="sg-loadshed-cost" style={{ marginTop: 10 }}>
+                Value of lost load
+              </label>
+              <div className="sg-carbon-row">
+                <span className="sg-carbon-sym">{currencySymbol}</span>
+                <input
+                  id="sg-loadshed-cost"
+                  type="number"
+                  className="sg-carbon-input"
+                  min={0}
+                  step={1}
+                  value={loadSheddingCost}
+                  onChange={(e) => onLoadSheddingCostChange(Math.max(0, parseFloat(e.target.value) || 0))}
+                />
+                <span className="sg-carbon-unit">/MWh</span>
+              </div>
+              <p className="sg-setting-hint">
+                Penalty applied to each MWh of unserved demand. Set well above the most expensive real generator.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="sg-setting-divider" />

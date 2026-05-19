@@ -69,7 +69,7 @@ export const DEFAULT_SHEET_ROWS: Record<SheetName, GridRow> = {
 export const CARRIER_COLORS: Record<string, string> = {
   AC: '#475569', LNG: '#1f4e79', Coal: '#374151', Nuclear: '#7c3aed',
   Solar: '#f59e0b', Wind: '#0f766e', Hydro: '#2563eb', Storage: '#14b8a6',
-  battery: '#0ea5e9', Imports: '#dc2626', LoadShedding: '#991b1b',
+  battery: '#0ea5e9', LoadShedding: '#991b1b',
   load: '#94a3b8', HVDC: '#6366f1', Other: '#94a3b8',
 };
 

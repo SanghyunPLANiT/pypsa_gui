@@ -45,7 +45,7 @@ def build_emissions_breakdown(
 
     for name in network.generators.index:
         # Skip system helpers
-        if name.startswith("load_shedding_") or name == "grid_imports":
+        if name.startswith("load_shedding_"):
             continue
         if name not in network.generators_t.p.columns:
             continue
