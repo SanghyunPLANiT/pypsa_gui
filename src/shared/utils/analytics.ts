@@ -1,4 +1,4 @@
-import { MetricOption, RunResults, SeriesPoint, TimeframeOption, TimeSeriesRow } from '../../types';
+import { MetricOption, RunResults, SeriesPoint, TimeframeOption, TimeSeriesRow } from '../types';
 import { numberValue } from './helpers';
 
 export function normalizeSeriesPoint(point: SeriesPoint): TimeSeriesRow {

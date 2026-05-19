@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { SHEETS, TS_SHEETS } from '../../constants';
-import { AnySheetName, GridRow, Primitive, WorkbookModel } from '../../types';
+import { AnySheetName, GridRow, Primitive, WorkbookModel } from '../types';
 
 export function normalizeCell(value: unknown): Primitive {
   if (value === undefined || value === null) return null;

@@ -19,12 +19,11 @@ import {
   WorkspaceTab,
   ModelSubTab,
   AnalyticsSubTab,
-} from './types';
+} from './shared/types';
 import { API_BASE, DEFAULT_CONSTRAINTS, DEFAULT_SHEET_ROWS, MAX_UNPINNED_HISTORY } from './constants';
 import { createEmptyWorkbook, exportWorkbook, loadSampleWorkbook, parseWorkbook, workbookToArrayBuffer, parseCsvToGridRows } from './shared/utils/workbook';
 import { exportFullResults } from './shared/utils/exportResults';
-import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, orderByCarrierRows, setCarrierColorOverrides as setSharedCarrierColorOverrides, snapshotMaxFromWorkbook } from './shared/utils/helpers';
-import { setCarrierColorOverrides as setLegacyCarrierColorOverrides } from './utils/helpers';
+import { getBounds, getBusIndex, carrierColor, hashColor, numberValue, orderByCarrierRows, setCarrierColorOverrides, snapshotMaxFromWorkbook } from './shared/utils/helpers';
 import { buildRowsFromGeneratorDetails, buildSystemLoadRows, normalizeSeriesPoint } from './shared/utils/analytics';
 import { RunDialog } from './features/run/RunDialog';
 import { Sidebar } from './layout/Sidebar';
@@ -117,8 +116,7 @@ function AppInner() {
   // and keeps assumptions out of the empty starting state.
 
   useEffect(() => {
-    setSharedCarrierColorOverrides(model.carriers);
-    setLegacyCarrierColorOverrides(model.carriers);
+    setCarrierColorOverrides(model.carriers);
   }, [model.carriers]);
 
   const bounds = useMemo(() => getBounds(model), [model.buses]);  // eslint-disable-line react-hooks/exhaustive-deps

@@ -1,4 +1,4 @@
-import { ConstraintMetric, CustomConstraint, GridRow, SheetName, TsSheetName } from '../types';
+import { ConstraintMetric, CustomConstraint, GridRow, SheetName, TsSheetName } from '../shared/types';
 export { SHEETS, TS_SHEETS } from './sheets';
 
 // ── API ───────────────────────────────────────────────────────────────────────

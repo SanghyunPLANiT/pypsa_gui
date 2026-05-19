@@ -8,16 +8,16 @@ import {
   RunResults,
   TimeframeOption,
   WorkbookModel,
-} from '../../types';
-import { clamp, numberValue, stringValue } from '../../shared/utils/helpers';
-import { aggregateMetricRows, buildDonutFromMetric } from '../../utils/analytics';
-import { EMPTY_METRIC_KEY } from '../../constants';
-import { exportChartToExcel } from '../../utils/exportChart';
-import { useToast } from '../common/Toast';
+} from '../../../shared/types';
+import { clamp, numberValue, stringValue } from '../../../shared/utils/helpers';
+import { aggregateMetricRows, buildDonutFromMetric } from '../../../shared/utils/analytics';
+import { EMPTY_METRIC_KEY } from '../../../constants';
+import { exportChartToExcel } from '../../../shared/utils/exportChart';
+import { useToast } from '../../../shared/components/Toast';
 import { DonutChart } from './DonutChart';
 import { InteractiveTimeSeriesCard } from './InteractiveTimeSeriesCard';
-import { TimelineSlider } from '../common/DualRangeSlider';
-import { useMetricOptions } from '../../features/analytics/useMetricOptions';
+import { TimelineSlider } from '../../../shared/components/DualRangeSlider';
+import { useMetricOptions } from '../useMetricOptions';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 type FocusType = AnalyticsFocus['type'];

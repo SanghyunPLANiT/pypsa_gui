@@ -27,7 +27,7 @@ import pypsa
 
 from ..utils.annuity import annuity_factor
 from ..utils.coerce import number
-from .generators import add_load_shedding
+from .load_shedding import add_load_shedding
 from .validators import validate_model  # re-export for backend.main
 
 __all__ = ["build_network", "validate_model"]

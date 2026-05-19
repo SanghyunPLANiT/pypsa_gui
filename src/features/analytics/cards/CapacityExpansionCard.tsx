@@ -4,8 +4,8 @@
  * Rendered inside ResultsDashboard only when expansionResults.length > 0.
  */
 import React from 'react';
-import { ExpansionAsset } from '../../types';
-import { carrierColor } from '../../utils/helpers';
+import { ExpansionAsset } from '../../../shared/types';
+import { carrierColor } from '../../../shared/utils/helpers';
 
 // ── Simple horizontal bar chart ───────────────────────────────────────────────
 

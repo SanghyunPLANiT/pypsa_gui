@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { RunResults, WorkbookModel } from '../../types';
+import { RunResults, WorkbookModel } from '../types';
 import { buildWorkbook } from './workbook';
 
 // ── helpers ───────────────────────────────────────────────────────────────────

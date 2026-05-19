@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ChartMode, TimeSeriesRow, TimeSeriesSeries } from '../../types';
-import { numberValue } from '../../utils/helpers';
+import { ChartMode, TimeSeriesRow, TimeSeriesSeries } from '../../../shared/types';
+import { numberValue } from '../../../shared/utils/helpers';
 
 export function InteractiveTimeSeriesCard({
   title,

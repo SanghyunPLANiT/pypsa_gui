@@ -3,13 +3,13 @@ import { RunResults, TimeSeriesRow, TimeSeriesSeries } from '../../shared/types'
 import { numberValue } from '../../shared/utils/helpers';
 import { exportChartToExcel } from '../../shared/utils/exportChart';
 import { useToast } from '../../shared/components/Toast';
-import { InteractiveTimeSeriesCard } from '../../components/charts/InteractiveTimeSeriesCard';
-import { DonutChart } from '../../components/charts/DonutChart';
-import { DurationCurveCard } from '../../components/charts/DurationCurveCard';
-import { CapacityExpansionCard } from '../../components/charts/CapacityExpansionCard';
-import { MeritOrderCard } from '../../components/charts/MeritOrderCard';
-import { Co2ShadowCard } from '../../components/charts/Co2ShadowCard';
-import { EmissionsBreakdownCard } from '../../components/charts/EmissionsBreakdownCard';
+import { InteractiveTimeSeriesCard } from './cards/InteractiveTimeSeriesCard';
+import { DonutChart } from './cards/DonutChart';
+import { DurationCurveCard } from './cards/DurationCurveCard';
+import { CapacityExpansionCard } from './cards/CapacityExpansionCard';
+import { MeritOrderCard } from './cards/MeritOrderCard';
+import { Co2ShadowCard } from './cards/Co2ShadowCard';
+import { EmissionsBreakdownCard } from './cards/EmissionsBreakdownCard';
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import { numberValue, stringValue, carrierColor, loadingColor, priceColor, resol
 import { FitToBounds } from '../map/FitToBounds';
 import { MapLegend, SmpLegend } from '../map/MapLegend';
 import { SummaryCards } from '../../shared/components/SummaryCards';
-import { UserDefinedChartCard } from '../../components/charts/UserDefinedChartCard';
+import { UserDefinedChartCard } from './cards/UserDefinedChartCard';
 import { ResultsDashboard } from './ResultsDashboard';
 import { MapDetailCard } from './MapDetailCard';
 

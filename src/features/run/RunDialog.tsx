@@ -7,7 +7,7 @@
  */
 import React, { useMemo } from 'react';
 import { GridRow } from '../../shared/types';
-import { DualRangeSlider } from './DualRangeSlider';
+import { DualRangeSlider } from '../../shared/components/DualRangeSlider';
 
 export interface RunDialogProps {
   open: boolean;

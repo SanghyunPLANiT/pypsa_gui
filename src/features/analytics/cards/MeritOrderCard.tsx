@@ -6,7 +6,7 @@
  * (width = p_nom, height = marginal_cost) coloured by carrier.
  */
 import React, { useState } from 'react';
-import { MeritOrderEntry } from '../../types';
+import { MeritOrderEntry } from '../../../shared/types';
 
 interface Props {
   entries: MeritOrderEntry[];
